@@ -1,0 +1,5 @@
+# remove dataset folders
+
+**/images
+**/labels
+**/json
