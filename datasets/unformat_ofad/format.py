@@ -2,9 +2,18 @@
 
 from PIL import Image
 import json
-from argparse import ArgumentParser
+import os
 
-sequences = ['000076','000080','000092','000104','000113','000121']
+if(not os.path.exists('../ofad')):
+    os.mkdir('../ofad')
+    os.mkdir('../ofad/images')
+    os.mkdir('../ofad/images/train')
+    os.mkdir('../ofad/labels')
+    os.mkdir('../ofad/labels/train')
+
+sequences = ['000076', '000080', '000092', '000104', '000113', '000121']
+
+max_seq_data = 260
 
 for seq in sequences:
 
@@ -20,6 +29,8 @@ for seq in sequences:
     # parse frames data
     ofad_frames = data['frames']
     yolo_frames = []
+
+    ofad_frames = ofad_frames[0:max_seq_data]
 
     for frame in ofad_frames:
         frame_id = frame['frame_id']
