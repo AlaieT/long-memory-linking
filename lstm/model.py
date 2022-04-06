@@ -1,7 +1,11 @@
+import re
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from torch import nn, optim
+import re
+import os
+import json
 
 # Create data
 
@@ -9,23 +13,37 @@ trajectory = []
 trajectory_count = 50
 trajectory_accurasy = 100
 
-x = np.empty((trajectory_count, trajectory_accurasy), np.float32)
-x[:] = np.arange(trajectory_accurasy)/200
 
-k = np.empty((trajectory_count, trajectory_accurasy), np.float32)
-k[:] = np.array([0.5]*100)
+def atoi(text):
+    return int(text) if text.isdigit() else text
 
-b = (np.arange(trajectory_count).reshape((50, 1))).tolist()
-b = np.array([el*trajectory_accurasy for el in b])
 
-b = -k*x
-y = k*x + b
+def natural_keys(text):
+    return [atoi(c) for c in re.split(r'(\d+)', text)]
 
-for i in range(50):
-    plt.plot(x[i], y[i])
 
-plt.ylim((0, 0.5))
-plt.show()
+annotation_files = []  # files for traning and vlidation
+
+if(os.path.exists('./validation/true')):
+    annotation_files = os.listdir('./validation/true')
+    annotation_files.sort(key=natural_keys)
+
+    in_frame_cars = []
+    in_frame_pedestrians = []
+
+    with open(f'./validation/true/{annotation_files[0]}') as f:
+        true_json = json.load(f)['sequence']
+        for frame in true_json:
+            in_frame_cars += frame['Car']
+            in_frame_pedestrians += frame['Pedestrians']
+
+        def get_my_key(obj):
+            return obj['id']
+
+        in_frame_cars.sort(key=get_my_key)
+        in_frame_pedestrians.sort(key=get_my_key)
+
+        
 
 
 class LSTM(nn.Module):
