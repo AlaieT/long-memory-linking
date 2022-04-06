@@ -1,14 +1,20 @@
 # remove dataset folders
-
 **/images
 **/labels
 **/json
 **/tracking
 
-# runs results
+# videos
+**/*.mp4
 
+# fonts
+**/*.ttf
+
+# jsons
+**/*.json
+
+# runs results
 **/runs
 
 # pytorch modesl
-
 **/*.pt
