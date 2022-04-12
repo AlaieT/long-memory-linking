@@ -18,3 +18,12 @@
 
 # pytorch modesl
 **/*.pt
+
+# -png
+**/*.png
+
+#-jpg
+**/*.jpg
+
+# macOS shit
+**/*.DS_Store
