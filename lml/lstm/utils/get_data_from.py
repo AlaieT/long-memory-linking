@@ -41,29 +41,29 @@ def get_data_from(path: str, mod: str):
                         for obj in frame['Car']:
                             box2d = obj['box2d']
                             h = abs(box2d[1] - box2d[3])/img_height
-                            a = abs(box2d[0] - box2d[2])/abs(box2d[1] - box2d[3])
+                            w = abs(box2d[0] - box2d[2])/img_width
                             x_c = (box2d[0] + abs(box2d[0] - box2d[2])/2)/img_width
                             y_c = (box2d[1] + abs(box2d[1] - box2d[3])/2)/img_height
                             if(obj['id'] in objects_id):
                                 obj_idx = objects_id.index(obj['id'])
-                                objects_on_frames[obj_idx].append([x_c, y_c, a, h])
+                                objects_on_frames[obj_idx].append([x_c, y_c, w, h])
                             else:
                                 objects_id.append(obj['id'])
-                                coords = [[x_c, y_c, a, h]]
+                                coords = [[x_c, y_c, w, h]]
                                 objects_on_frames.append(coords)
                     if('Pedestrian' in frame):
                         for obj in frame['Pedestrian']:
                             box2d = obj['box2d']
                             h = abs(box2d[1] - box2d[3])/img_height
-                            a = abs(box2d[0] - box2d[2])/abs(box2d[1] - box2d[3])
+                            w = abs(box2d[0] - box2d[2])/img_width
                             x_c = (box2d[0] + abs(box2d[0] - box2d[2])/2)/img_width
                             y_c = (box2d[1] + abs(box2d[1] - box2d[3])/2)/img_height
                             if(obj['id'] in objects_id):
                                 obj_idx = objects_id.index(obj['id'])
-                                objects_on_frames[obj_idx].append([x_c, y_c, a, h])
+                                objects_on_frames[obj_idx].append([x_c, y_c, w, h])
                             else:
                                 objects_id.append(obj['id'])
-                                coords = [[x_c, y_c, a, h]]
+                                coords = [[x_c, y_c, w, h]]
                                 objects_on_frames.append(coords)
 
         # split data by length
@@ -71,16 +71,15 @@ def get_data_from(path: str, mod: str):
             splited_data = []
 
             for i in range(len(objects_on_frames)):
-                if(len(objects_on_frames[i]) > 2):
-                    if(len(objects_on_frames[i]) > 7):
-                        for k in range(0, floor(len(objects_on_frames[i])/5), 1):
-                            splited_data.append(objects_on_frames[i][k*3:(k+1)*5])
-                        if(len(objects_on_frames[i]) - (k+1)*5 > 0):
-                            splited_data.append(objects_on_frames[i][(k+1)*5:])
-                    else:
-                        splited_data.append(objects_on_frames[i])
+                splited_data.append(objects_on_frames[i])
+                if(len(objects_on_frames[i]) > 6):
+                    for k in range(0, floor(len(objects_on_frames[i])/5), 1):
+                        splited_data.append(objects_on_frames[i][k*3:(k+1)*5])
+                    if(len(objects_on_frames[i]) - (k+1)*5 > 2):
+                        splited_data.append(objects_on_frames[i][(k+1)*5:])
 
             random.shuffle(splited_data)
+
             return splited_data, frames_count
 
     random.shuffle(objects_on_frames)

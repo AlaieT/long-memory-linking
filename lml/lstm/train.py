@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import torch
 from torch import nn, optim
@@ -17,17 +18,23 @@ objects_train, _ = get_data_from('./data/train', 'train')
 objects_valid, _ = get_data_from('./data/valid', 'valid')
 
 model_lstm = LSTM()
-criterion = nn.HuberLoss()
-optimiser = optim.Adam(model_lstm.parameters())
+criterion = nn.BCELoss()
+optimiser = optim.Adam(model_lstm.parameters(), lr=2e-3)
+
 
 def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data):
 
     loss_val = []
     loss_train = []
     dx_fr = []
+
+    best_dx = 1
+
     for i in range(n_epochs):
         model.train()
         mean_loss = 0
+
+        random.shuffle(train_data)
 
         print(f"\n------------------------------------> Epoch: {i+1}\n")
 
@@ -83,17 +90,19 @@ def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data):
 
                     if(samples.shape[1] > 1):
 
-                        cur_test = samples[0, :-1, :]
-                        cur_test_tar = samples[0, -1, :]
+                        if(samples.shape[1] >= 6):
+                            cur_test = samples[0, -6:-1, :]
+                            cur_test_tar = samples[0, -1, :]
+                        else:
+                            cur_test = samples[0, :-1, :]
+                            cur_test_tar = samples[0, -1, :]
 
                         cur_test = torch.tensor(cur_test.reshape((1, cur_test.shape[0], 4)))
                         cur_test_tar = torch.tensor(cur_test_tar.reshape((1, 1, 4)))
 
                         pred = model(cur_test)
-
                         loss = loss_fn(pred, cur_test_tar)
                         outs = pred.detach().numpy().reshape((4,))
-                        # real = samples[0, :, :]
 
                         mean_loss = mean_loss + loss.detach().numpy().tolist()
 
@@ -103,6 +112,8 @@ def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data):
                         wh = np.sqrt((real_xy[2]*real_xy[3]-out_xy[2]*real_xy[3])**2+(real_xy[3]-out_xy[3])**2)
                         mean_dx = np.append(mean_dx, dx)
                         mean_wh = np.append(mean_wh, wh)
+
+                        # real = samples[0, :, :]
 
                         # Plot valid
                         # if(k == 10):
@@ -125,14 +136,20 @@ def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data):
             loss_val.append(mean_loss)
 
             print("\033[0;0m" + f"\n\tVal loss: {mean_loss}\n")
-            print(f'\tMin LT: {np.min(mean_dx)} Min RB: {np.min(mean_wh)}\n')
-            print(f'\tMax LT: {np.max(mean_dx)} Max RB: {np.max(mean_wh)}\n')
-            print(f'\tMean LT: {np.mean(mean_dx)} Mean RB: {np.mean(mean_wh)}')
+            print(f'\tMin Dx: {np.min(mean_dx)} Min WH: {np.min(mean_wh)}\n')
+            print(f'\tMax Dx: {np.max(mean_dx)} Max WH: {np.max(mean_wh)}\n')
+            print(f'\tMean Dx: {np.mean(mean_dx)} Mean WH: {np.mean(mean_wh)}')
+
+            if(best_dx > np.mean(mean_dx)):
+                best_dx = np.mean(mean_dx)
+                if(not os.path.exists('./models')):
+                    os.mkdir('./models')
+                torch.save(model_lstm.state_dict(), './models/best.pt')
 
     return loss_train, loss_val, dx_fr
 
 
-loss_train, loss_val, dx_fr = training_loop(n_epochs=20, model=model_lstm, optimiser=optimiser,
+loss_train, loss_val, dx_fr = training_loop(n_epochs=25, model=model_lstm, optimiser=optimiser,
                                             loss_fn=criterion, train_data=objects_train, test_data=objects_valid)
 
 # -----------------------------------------------------------------------------
@@ -166,4 +183,4 @@ plt.close()
 if(not os.path.exists('./models')):
     os.mkdir('./models')
 
-torch.save(model_lstm.state_dict(),'./models/lstm.pt') 
+torch.save(model_lstm.state_dict(), './models/last.pt')
