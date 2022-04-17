@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.linalg import norm
+import torch
 
 
 class Frame_Object(object):
@@ -10,6 +11,7 @@ class Frame_Object(object):
         self._y_c = np.append(np.array([-1]*n), [y])
         self._b_w = np.append(np.array([-1]*n), [w])
         self._b_h = np.append(np.array([-1]*n), [h])
+        # self._img = img
         self._lost = False
         self._lost_frames = 0
         self._tracking = True
@@ -41,8 +43,10 @@ class Frame_Object(object):
             self._b_w = np.append(self._b_w[: -1].copy(), w)
             self._b_h = np.append(self._b_h[: -1].copy(), h)
 
+        # self._img = img
+
     def lost(self):
-        if(self._tracking and (self._lost_frames >= 500 or self._x_c.shape[0] < 2)):
+        if(self._tracking and self._lost_frames >= 600):
             self._tracking = False
             self._x_c = self._x_c[:-self._lost_frames]
             self._y_c = self._y_c[:-self._lost_frames]
@@ -54,29 +58,41 @@ class Frame_Object(object):
             self._lost_frames += 1
             self._lost = True
 
-    def mahalanobis_distance(self, cl: np.float32, x: np.float32, y: np.float32, w: np.float32, h: np.float32) -> int:
-
-        combined = np.zeros((self._x_c[self._x_c != -1].shape[0], 4))
-        combined[:, 0] = self._x_c[self._x_c != -1]
-        combined[:, 1] = self._y_c[self._y_c != -1]
-        combined[:, 2] = self._b_w[self._b_w != -1]
-        combined[:, 3] = self._b_h[self._b_h != -1]
-
-        covariance_matrix = np.cov(np.array(combined), rowvar=False, ddof=1, dtype=np.float32)
-        inv_cov = np.linalg.inv(covariance_matrix + np.identity(covariance_matrix.shape[0]))
-
+    def mahalanobis_distance(
+            self, cl: np.float32, x: np.float32, y: np.float32, w: np.float32, h: np.float32) -> int:
         all_dx = []
         eps = 0.45
 
-        for i in range(len(x)):
+        _x = self._x_c[self._x_c != -1]
+        _y = self._y_c[self._y_c != -1]
+        _w = self._b_w[self._b_w != -1]
+        _h = self._b_h[self._b_h != -1]
 
+        if(_x.shape[0] >= 10):
+            _x = _x[-10:]
+            _y = _y[-10:]
+            _w = _w[-10:]
+            _h = _h[-10:]
+
+        combined = np.zeros((_x.shape[0], 4))
+        combined[:, 0] = _x
+        combined[:, 1] = _y
+        combined[:, 2] = _w
+        combined[:, 3] = _h
+
+        # prev_img = torch.from_numpy(self._img).unsqueeze(0)
+
+        for i in range(len(x)):
             if(cl[i] == self._class):
-                pred = np.array(
-                    [self._x_c[self._x_c != -1][-1],
-                     self._y_c[self._y_c != -1][-1],
-                     self._b_w[self._b_w != -1][-1],
-                     self._b_h[self._b_h != -1][-1]])
-                real = np.array([x[i], y[i], w[i], h[i]])
+
+                # new_img = torch.from_numpy(img[i, :, :, :]).unsqueeze(0)
+                # apperance = model(prev_img, new_img).cpu().detach().numpy()[0, 0]
+
+                covariance_matrix = np.cov(np.array(combined), rowvar=False, ddof=1, dtype=np.float32)
+                inv_cov = np.linalg.inv(covariance_matrix + np.identity(covariance_matrix.shape[0]))
+
+                pred = np.array([_x[-1], _y[-1], _w[-1], _h[-1]])
+                real = np.array([x[i], y[i],  w[i], h[i]])
                 temp_xy = pred - real
                 dx = np.sqrt(np.matmul(np.matmul(temp_xy, inv_cov), temp_xy.T))
                 lm = np.dot(pred, real)/(norm(pred)*norm(real))
@@ -84,4 +100,5 @@ class Frame_Object(object):
                 d = eps*dx+(1-eps)*lm
 
                 all_dx.append(d)
+
         return all_dx
