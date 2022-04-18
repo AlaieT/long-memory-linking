@@ -4,6 +4,7 @@ import re
 import os
 import json
 import numpy as np
+import torch
 
 # -----------------------------------------------------------------------------
 # ----------------------------Load and parse data------------------------------
@@ -20,6 +21,15 @@ def atoi(text):
 
 def natural_keys(text):
     return [atoi(c) for c in re.split(r'(\d+)', text)]
+
+
+def to_tensor(data):
+    data = data
+    samples = np.empty((1, len(data), 4), dtype=np.float32)
+    samples[0, :, :] = np.array(data, dtype=np.float32)
+    samples = torch.tensor(samples.reshape((1, samples.shape[1], 4)))
+
+    return samples
 
 
 def get_data_from(path: str, mod: str):
@@ -69,18 +79,20 @@ def get_data_from(path: str, mod: str):
         # split data by length
         if(mod == 'train'):
             splited_data = []
-
             for i in range(len(objects_on_frames)):
-                splited_data.append(objects_on_frames[i])
+                splited_data.append(to_tensor(objects_on_frames[i]))
+
                 if(len(objects_on_frames[i]) > 6):
-                    for k in range(0, floor(len(objects_on_frames[i])/5), 1):
-                        splited_data.append(objects_on_frames[i][k*3:(k+1)*5])
-                    if(len(objects_on_frames[i]) - (k+1)*5 > 2):
-                        splited_data.append(objects_on_frames[i][(k+1)*5:])
+                    for k in range(0, floor(len(objects_on_frames[i])/4), 1):
+                        splited_data.append(to_tensor(objects_on_frames[i][k*2:(k+1)*4]))
 
-            random.shuffle(splited_data)
+                    if(len(objects_on_frames[i]) - (k+1)*4 > 2):
+                        splited_data.append(to_tensor(objects_on_frames[i][(k+1)*4:]))
 
-            return splited_data, frames_count
+        else:
+            splited_data = []
+            for i in range(len(objects_on_frames)):
+                splited_data.append(to_tensor(objects_on_frames[i]))
 
-    random.shuffle(objects_on_frames)
-    return objects_on_frames, frames_count
+    random.shuffle(splited_data)
+    return splited_data, frames_count

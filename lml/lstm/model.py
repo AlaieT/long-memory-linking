@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 
 class LSTM(nn.Module):
-    def __init__(self, hidden_layers=32):
+    def __init__(self, hidden_layers=64):
         super(LSTM, self).__init__()
         self.hidden_layers = hidden_layers
 

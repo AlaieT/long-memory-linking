@@ -3,10 +3,12 @@ import os
 import numpy as np
 from utils.frame_object import Frame_Object
 from utils.video_worker import Video_Worker
+from utils.image_worker import get_image
 # from PIL import Image, ImageDraw, ImageFont
 import json
 from lstm.predict import predict
 from lstm.model import LSTM
+# from siamese_nn.model import SiameseNetwork
 import torch
 from scipy.optimize import linear_sum_assignment
 import pandas as pd
@@ -19,16 +21,22 @@ video_worker = Video_Worker()
 # # Detect on frames
 # os.system('python3 ../yolov5/detect.py --weights ../yolov5/yolov5x.pt --source ../lml/data/images --data ../yolov5/data/coco128.yaml --classes 0 2 --project ../lml/data --nosave --save-txt')
 
-save_tracking = False
-
 # define lstm model for predicion of next position
 model_lstm = LSTM()
-model_lstm.load_state_dict(torch.load('./lstm/models/best.pt'))
+model_lstm.load_state_dict(torch.load('./lstm/models/last.pt'))
 model_lstm.eval()
+
+# model_siamese = SiameseNetwork()
+# model_siamese.cpu()
+# model_siamese.load_state_dict(torch.load('./siamese_nn/models/best.pt', map_location=torch.device('cpu')))
+# model_siamese.eval()
 
 
 videos = ['train_06', 'train_07', 'train_10', 'train_14', 'train_19']
 res_json = {'train_06.mp4': [], 'train_07.mp4': [], 'train_10.mp4': [], 'train_14.mp4': [], 'train_19.mp4': []}
+
+# videos = ['train_10']
+# res_json = {'train_10.mp4': []}
 
 
 for video in videos:
@@ -56,18 +64,15 @@ for video in videos:
             temp_csv_new = temp_csv.drop(['filename', 'confidence'], 1)
             files.append(temp_csv_new.values.tolist())
 
-        # if(save_tracking):
-        #     images = os.listdir('./data/images')
-        #     images.sort(key=video_worker.natural_keys)
-
         frames_count = len(files)
 
     # For now tracking not live, 'cos beta
     with tqdm(total=frames_count, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') as pbar:
-        for file in files:
+        for (idx, file) in enumerate(files):
             detected_classes = np.empty((0, 5), dtype=np.float32)
+            detected_img = np.empty((0, 3, 108, 108), dtype=np.float32)
 
-            # Get from detecte object only class, Xc, Yc
+            # -----------------------> Get objects from new(current) frame
             for obj in file:
                 # line_data = obj.split()
                 _class = int(obj[4])
@@ -77,13 +82,25 @@ for video in videos:
                 _h = float(obj[3])
 
                 if(_w*_h*1936*1216 >= 1024):
+                    # if(idx < 10):
+                    #     path = f'./siamese_nn/data/images/valid/{video}/{video}-00{idx}.png'
+                    # elif (idx < 100):
+                    #     path = f'./siamese_nn/data/images/valid/{video}/{video}-0{idx}.png'
+                    # elif (idx < 999):
+                    #     path = f'./siamese_nn/data/images/valid/{video}/{video}-{idx}.png'
+
+                    # img = get_image(path, [_x*1936, _y*1216, _w*1936, _h*1216])
+
                     new_data = np.empty((1, 5))
-                    new_data[0:] = np.array([_class, _x, _y, _w, _h])
+                    new_data[0:] = np.array([_class, _x, _y, _w, _h], dtype=np.float32)
+
                     if(detected_classes.shape == 0):
                         detected_classes = np.expand_dims(detected_classes, axis=0)
+                        detected_img = np.expand_dims(detected_img, axis=0)
                     detected_classes = np.append(detected_classes, new_data, axis=0)
+                    # detected_img = np.append(detected_img, img, axis=0)
 
-            # Mahalanobis distance, link new frame objects to prev frame objects
+            # -----------------------> Caluletae distance between prev-frame object and new objects, and link them
             all_dx_0 = np.empty((len([cl for cl in linked_data if cl._class == 0 and cl._tracking]), len(
                 [cl for cl in detected_classes if cl[0] == 0])), dtype=np.float32)
             all_dx_2 = np.empty((len([cl for cl in linked_data if cl._class == 1 and cl._tracking]), len(
@@ -92,6 +109,7 @@ for video in videos:
             am_0 = 0
             am_2 = 0
 
+            # Calulcate distance
             for in_frame_obj in linked_data:
                 if(in_frame_obj._tracking):
                     obj_dx = in_frame_obj.mahalanobis_distance(
@@ -99,7 +117,10 @@ for video in videos:
                         detected_classes[:, 1],
                         detected_classes[:, 2],
                         detected_classes[:, 3],
-                        detected_classes[:, 4])
+                        detected_classes[:, 4],
+                        # detected_img,
+                        # model_siamese
+                        )
 
                     if(in_frame_obj._class == 0):
                         all_dx_0[am_0, :] = np.array(obj_dx)
@@ -108,51 +129,64 @@ for video in videos:
                         all_dx_2[am_2, :] = np.array(obj_dx)
                         am_2 += 1
 
+            # Linking object of personn class
             if(all_dx_0.shape[0] > 0):
                 row_ind, col_ind = linear_sum_assignment(all_dx_0)
                 row_ind = row_ind.tolist()
                 col_ind = col_ind.tolist()
                 temp_linked = [cl for cl in linked_data if cl._class == 0 and cl._tracking]
                 temp_detected = np.array([cl for cl in detected_classes if cl[0] == 0])
+                # temp_img = np.array([cl for (i, cl) in enumerate(detected_img) if detected_classes[i, 0] == 0])
 
+                # Linking objects
                 for (i, row) in enumerate(row_ind):
                     # linking object
                     _x = temp_detected[col_ind[i], 1]
                     _y = temp_detected[col_ind[i], 2]
                     _w = temp_detected[col_ind[i], 3]
                     _h = temp_detected[col_ind[i], 4]
+                    # _img = temp_img[col_ind[i], :, :, :]
 
-                    temp_linked[row].update_state(_x, _y, _w, _h)
+                    # temp_linked[row].update_state(_x, _y, _w, _h, _img)
+                    temp_linked[row].update_state(_x, _y, _w, _h,)
 
+                # Lost objects
                 for i in range(len(temp_linked)):
                     if(not (i in row_ind)):
                         temp_linked[i].lost()
 
                 delete_idx = []
                 am_0 = 0
+                # Left unliked new objects as new deteced objects
                 for col in range(detected_classes.shape[0]):
                     if(detected_classes[col, 0] == 0):
                         if(am_0 in col_ind):
                             delete_idx.append(col)
                         am_0 += 1
                 detected_classes = np.delete(detected_classes, delete_idx, axis=0)
+                # detected_img = np.delete(detected_img, delete_idx, axis=0)
 
+            # Linking objects of car class
             if(all_dx_2.shape[0] > 0):
                 row_ind, col_ind = linear_sum_assignment(all_dx_2)
                 row_ind = row_ind.tolist()
                 col_ind = col_ind.tolist()
                 temp_linked = [cl for cl in linked_data if cl._class == 1 and cl._tracking]
                 temp_detected = np.array([cl for cl in detected_classes if cl[0] == 1])
+                # temp_img = np.array([cl for (i, cl) in enumerate(detected_img) if detected_classes[i, 0] == 1])
 
+                # Linking objects
                 for (i, row) in enumerate(row_ind):
                     # linking object
                     _x = temp_detected[col_ind[i], 1]
                     _y = temp_detected[col_ind[i], 2]
                     _w = temp_detected[col_ind[i], 3]
                     _h = temp_detected[col_ind[i], 4]
+                    # _img = temp_img[col_ind[i], :, :, :]
 
+                    # temp_linked[row].update_state(_x, _y, _w, _h, _img)
                     temp_linked[row].update_state(_x, _y, _w, _h)
-
+                # Lost objects
                 for i in range(len(temp_linked)):
                     if(not (i in row_ind)):
                         temp_linked[i].lost()
@@ -160,14 +194,16 @@ for video in videos:
 
                 delete_idx = []
                 am_2 = 0
+                # Left unliked new objects as new deteced objects
                 for col in range(detected_classes.shape[0]):
                     if(detected_classes[col, 0] == 1):
                         if(am_2 in col_ind):
                             delete_idx.append(col)
                         am_2 += 1
                 detected_classes = np.delete(detected_classes, delete_idx, axis=0)
+                # detected_img = np.delete(detected_img, delete_idx, axis=0)
 
-            # Add object that was detected in first time during all time of detection
+            # Add new detect objects
             for k in range(detected_classes.shape[0]):
                 _class = int(detected_classes[k, 0])
                 detected_object_numeration[_class] += 1
@@ -178,13 +214,14 @@ for video in videos:
                     detected_classes[k, 2],
                     detected_classes[k, 3],
                     detected_classes[k, 4],
+                    # detected_img[k, :, :, :],
                     frame_idx)
 
                 linked_data = np.append(linked_data, new_object)
 
             # END OF CURRENT FRAME -------> extract tracking data from here
 
-            # Predict nex frame
+            # Predict nex frame for objects that is still tracking
             if(frame_idx != frames_count-1):
                 for in_frame_obj in linked_data:
                     if(in_frame_obj._tracking):
@@ -194,51 +231,6 @@ for video in videos:
                         cpp_h = in_frame_obj._b_h.copy()
                         preds = predict(cpp_x, cpp_y, cpp_w, cpp_h, model_lstm)
                         in_frame_obj.add_state(preds[0], preds[1], preds[2], preds[3])
-            # Draw boxes
-            # if(save_tracking):
-            #     # Draw boxes
-            #     if(not os.path.exists('./tracking')):
-            #         os.mkdir('./tracking')
-
-            #     img = Image.open(f'./data/images/{images[frame_idx]}')
-            #     draw = ImageDraw.Draw(img)
-            #     font = ImageFont.truetype("./font/arial_bold.ttf", 20)
-
-            #     for i in range(len(linked_data)):
-            #         if(linked_data[i]._tracking):
-            #             color = (0, 255, 0)
-            #             if(linked_data[i]._class == 2.0):
-            #                 color = (255, 0, 255)
-            #             if(linked_data[i]._class == 7.0):
-            #                 color = (0, 255, 255)
-            #             if(linked_data[i]._lost):
-            #                 color = (255, 0, 0)
-
-            #             x_t = (linked_data[i]._x_c[frame_idx] - linked_data[i]._b_w[frame_idx]/2)*1936
-            #             x_b = (linked_data[i]._x_c[frame_idx] + linked_data[i]._b_w[frame_idx]/2)*1936
-
-            #             y_t = (linked_data[i]._y_c[frame_idx] - linked_data[i]._b_h[frame_idx]/2)*1216
-            #             y_b = (linked_data[i]._y_c[frame_idx] + linked_data[i]._b_h[frame_idx]/2)*1216
-            #             draw.rectangle((x_t, y_t, x_b, y_b), outline=color, width=2)
-
-            #             w_txt, h_txt = font.getsize(f'{linked_data[i]._name}')
-            #             draw.rectangle((x_t, y_t-h_txt, x_t+w_txt, y_t), fill=color)
-            #             draw.text((x_t, y_t-h_txt,), f'{linked_data[i]._name}', font=font, fill='black')
-
-            #             if(linked_data[i]._x_c[linked_data[i]._x_c != -1].shape[0] > 1):
-            #                 cpp_x = linked_data[i]._x_c[linked_data[i]._x_c != -1]
-            #                 cpp_y = linked_data[i]._y_c[linked_data[i]._y_c != -1]
-
-            #                 first_x = cpp_x[:-1]
-            #                 second_x = cpp_x[1:]
-
-            #                 first_y = cpp_y[:-1]
-            #                 second_y = cpp_y[1:]
-
-            #                 for k in range(cpp_x.shape[0]-1):
-            #                     draw.line((first_x[k]*1936, first_y[k]*1216, second_x[k]*1936, second_y[k]*1216), fill=color, width=3)
-
-            #         img.save(f'./tracking/{frame_idx}.jpg')
 
             frame_idx += 1
             pbar.update(1)
@@ -281,10 +273,12 @@ for video in videos:
                     if(int(in_frame_obj._class) == 0):
                         frame_car.append({'id': int(in_frame_obj._name), 'box2d': box2d})
 
-        res_json[f'{video}.mp4'].append({'Car': frame_car, 'Pedestrian': frame_pedestrian})
+        if(len(frame_pedestrian) == 0):
+            res_json[f'{video}.mp4'].append({'Car': frame_car})
+        if(len(frame_car) == 0):
+            res_json[f'{video}.mp4'].append({'Pedestrian': frame_pedestrian})
+        if(len(frame_car) != 0 and len(frame_pedestrian) != 0):
+            res_json[f'{video}.mp4'].append({'Car': frame_car, 'Pedestrian': frame_pedestrian})
 
 with open('./validation/val.json', 'w') as f:
     f.write(json.dumps(res_json))
-
-
-# video_worker.collect_all('./tracking', './video', 'result.mp4')
