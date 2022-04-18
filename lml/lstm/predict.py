@@ -5,18 +5,27 @@ import torch
 
 def predict(x: np.float32, y: np.float32, w: np.float32, h: np.float32, model_: any):
     with torch.no_grad():
-        if(x.shape[0] < 10):
-            sample = np.empty((1, x.shape[0], 4), dtype=np.float32)
-            sample[0, :, 0] = x
-            sample[0, :, 1] = y
-            sample[0, :, 2] = w
-            sample[0, :, 3] = h
+        if(x.shape[0] >= 10):
+            _x = x[-10:]
+            _y = y[-10:]
+            _w = w[-10:]
+            _h = h[-10:]
+
+            _x = _x[_x != -1]
+            _y = _y[_y != -1]
+            _w = _w[_w != -1]
+            _h = _h[_h != -1]
         else:
-            sample = np.empty((1, 10, 4), dtype=np.float32)
-            sample[0, :, 0] = x[-10:]
-            sample[0, :, 1] = y[-10:]
-            sample[0, :, 2] = w[-10:]
-            sample[0, :, 3] = h[-10:]
+            _x = x[x != -1]
+            _y = y[y != -1]
+            _w = w[w != -1]
+            _h = h[h != -1]
+
+        sample = np.empty((1, _x.shape[0], 4), dtype=np.float32)
+        sample[0, :, 0] = _x
+        sample[0, :, 1] = _y
+        sample[0, :, 2] = _w
+        sample[0, :, 3] = _h
 
         data = torch.from_numpy(sample)
 

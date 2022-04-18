@@ -23,7 +23,7 @@ save_tracking = False
 
 # define lstm model for predicion of next position
 model_lstm = LSTM()
-model_lstm.load_state_dict(torch.load('./lstm/models/lstm.pt'))
+model_lstm.load_state_dict(torch.load('./lstm/models/best.pt'))
 model_lstm.eval()
 
 
@@ -188,13 +188,12 @@ for video in videos:
             if(frame_idx != frames_count-1):
                 for in_frame_obj in linked_data:
                     if(in_frame_obj._tracking):
-                        cpp_x = in_frame_obj._x_c[in_frame_obj._x_c != -1].copy()
-                        cpp_y = in_frame_obj._y_c[in_frame_obj._y_c != -1].copy()
-                        cpp_w = in_frame_obj._b_w[in_frame_obj._b_w != -1].copy()
-                        cpp_h = in_frame_obj._b_h[in_frame_obj._b_h != -1].copy()
+                        cpp_x = in_frame_obj._x_c.copy()
+                        cpp_y = in_frame_obj._y_c.copy()
+                        cpp_w = in_frame_obj._b_w.copy()
+                        cpp_h = in_frame_obj._b_h.copy()
                         preds = predict(cpp_x, cpp_y, cpp_w, cpp_h, model_lstm)
                         in_frame_obj.add_state(preds[0], preds[1], preds[2], preds[3])
-
             # Draw boxes
             # if(save_tracking):
             #     # Draw boxes
