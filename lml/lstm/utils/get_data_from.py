@@ -32,16 +32,16 @@ def to_tensor(data):
     return samples
 
 
-def get_data_from(path: str, mod: str):
+def get_data_from(path: str, folds: list, mod: str):
     objects_id = []
     objects_on_frames = []
+    splited_data = []
     frames_count = 0
 
     if(os.path.exists(path)):
-        files = os.listdir(path)
-        files.sort(key=natural_keys)
+        folds.sort(key=natural_keys)
 
-        for file in files:
+        for file in folds:
             with open(f'{path}/{file}') as f:
                 true_json = json.load(f)['sequence']
                 frames_count = len(true_json)
@@ -78,16 +78,15 @@ def get_data_from(path: str, mod: str):
 
         # split data by length
         if(mod == 'train'):
-            splited_data = []
             for i in range(len(objects_on_frames)):
                 splited_data.append(to_tensor(objects_on_frames[i]))
 
                 if(len(objects_on_frames[i]) > 6):
-                    for k in range(0, floor(len(objects_on_frames[i])/4), 1):
-                        splited_data.append(to_tensor(objects_on_frames[i][k*2:(k+1)*4]))
+                    for k in range(0, floor(len(objects_on_frames[i])/5), 1):
+                        splited_data.append(to_tensor(objects_on_frames[i][k*2:(k+1)*5]))
 
-                    if(len(objects_on_frames[i]) - (k+1)*4 > 2):
-                        splited_data.append(to_tensor(objects_on_frames[i][(k+1)*4:]))
+                    if(len(objects_on_frames[i]) - (k+1)*5 > 2):
+                        splited_data.append(to_tensor(objects_on_frames[i][(k+1)*5:]))
 
         else:
             splited_data = []

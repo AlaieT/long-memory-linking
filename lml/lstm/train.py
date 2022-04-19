@@ -4,7 +4,6 @@ import torch
 from torch import nn, optim
 import os
 import matplotlib.pyplot as plt
-from utils.show_in_time import show_in_time
 from utils.get_data_from import get_data_from
 from model import LSTM
 from tqdm import tqdm
@@ -15,24 +14,15 @@ import torch.nn.functional as F
 # -----------------------------------------------------------------------------
 
 
-class EuclideanLoss(nn.Module):
-    def __init__(self) -> None:
-        super(EuclideanLoss, self).__init__()
-
-    def forward(self, pred, target):
-        return F.pairwise_distance(pred.squeeze(0).squeeze(0), target.squeeze(0).squeeze(0))
-
-
 # Train and valid data
-objects_train, _ = get_data_from('./data/train', 'train')
-objects_valid, _ = get_data_from('./data/valid', 'valid')
-model_lstm = LSTM()
+# objects_train, _ = get_data_from('./data/train', 'train')
+# objects_valid, _ = get_data_from('./data/valid', 'valid')
+# model_lstm = LSTM()
 # criterion = nn.L1Loss()
-criterion = EuclideanLoss()
-optimiser = optim.Adam(model_lstm.parameters(), lr=1e-3)
+# optimiser = optim.Adam(model_lstm.parameters(), lr=1e-3)
 
 
-def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data):
+def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data, save_path):
 
     loss_val = []
     loss_train = []
@@ -111,21 +101,6 @@ def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data):
                         mean_dx = np.append(mean_dx, dx)
                         mean_wh = np.append(mean_wh, wh)
 
-                        # Plot valid
-                        # real = samples[0, :, :]
-                        # if(k == 10):
-                        #     collect_out = [samples[0, 0, :].tolist()]
-                        #     for p in range(1, samples.shape[1], 1):
-                        #         cur_test = samples[0, :p, :]
-                        #         cur_test = torch.tensor(cur_test.reshape((1, cur_test.shape[0], 4)))
-
-                        #         pred = model(cur_test)
-                        #         outs = pred.detach().numpy().reshape((4,))
-
-                        #         collect_out.append(outs)
-
-                        #     show_in_time(collect_out,  real, f'step_{i+1}_{k}')
-
                     pbar_val.update(1)
                 pbar_val.close()
 
@@ -137,17 +112,23 @@ def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data):
             print(f'\tMax Dx: {np.max(mean_dx)} Max WH: {np.max(mean_wh)}\n')
             print(f'\tMean Dx: {np.mean(mean_dx)} Mean WH: {np.mean(mean_wh)}')
 
-            if(best_dx > np.mean(mean_dx)):
+            if(best_dx >= np.mean(mean_dx)):
                 best_dx = np.mean(mean_dx)
-                if(not os.path.exists('./models')):
-                    os.mkdir('./models')
-                torch.save(model_lstm.state_dict(), './models/best.pt')
+                if(not os.path.exists(f'{save_path}')):
+                    os.mkdir(f'{save_path}')
+                torch.save(model.state_dict(), f'{save_path}/best.pt')
+
+            if(i == n_epochs-1):
+                if(not os.path.exists(f'{save_path}')):
+                    os.mkdir(f'{save_path}')
+                torch.save(model.state_dict(), f'{save_path}/last.pt')
 
     return loss_train, loss_val, dx_fr
 
 
-loss_train, loss_val, dx_fr = training_loop(n_epochs=20, model=model_lstm, optimiser=optimiser,
-                                            loss_fn=criterion, train_data=objects_train, test_data=objects_valid)
+# loss_train, loss_val, dx_fr = training_loop(
+#     n_epochs=20, model=model_lstm, optimiser=optimiser, loss_fn=criterion, train_data=objects_train,
+#     test_data=objects_valid, save_path='./models')
 
 # -----------------------------------------------------------------------------
 # ------------------------------Save metrick data------------------------------
@@ -155,29 +136,23 @@ loss_train, loss_val, dx_fr = training_loop(n_epochs=20, model=model_lstm, optim
 
 # Create a visualization
 
-if(not os.path.exists('./metricks')):
-    os.mkdir('./metricks')
+# if(not os.path.exists('./metricks')):
+#     os.mkdir('./metricks')
 
-fig, axs = plt.subplots(3, 1, figsize=(18, 18))
-fig.tight_layout()
+# fig, axs = plt.subplots(3, 1, figsize=(18, 18))
+# fig.tight_layout()
 
-axs[0].plot(np.linspace(0, len(loss_train), len(loss_train)), loss_train)
-axs[0].set_title('Loss Train')
-axs[0].grid()
+# axs[0].plot(np.linspace(0, len(loss_train), len(loss_train)), loss_train)
+# axs[0].set_title('Loss Train')
+# axs[0].grid()
 
-axs[1].plot(np.linspace(0, len(loss_val), len(loss_val)), loss_val)
-axs[1].set_title('Loss Val')
-axs[1].grid()
+# axs[1].plot(np.linspace(0, len(loss_val), len(loss_val)), loss_val)
+# axs[1].set_title('Loss Val')
+# axs[1].grid()
 
-axs[2].plot(np.linspace(0, len(dx_fr), len(dx_fr)), dx_fr)
-axs[2].set_title('Dx')
-axs[2].grid()
+# axs[2].plot(np.linspace(0, len(dx_fr), len(dx_fr)), dx_fr)
+# axs[2].set_title('Dx')
+# axs[2].grid()
 
-plt.savefig(f"./metricks/metricks.png", dpi=250)
-plt.close()
-
-
-if(not os.path.exists('./models')):
-    os.mkdir('./models')
-
-torch.save(model_lstm.state_dict(), './models/last.pt')
+# plt.savefig(f"./metricks/metricks.png", dpi=250)
+# plt.close()
