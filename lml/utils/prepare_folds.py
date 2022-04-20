@@ -32,7 +32,7 @@ for (idx, fold) in enumerate(folds):
                         w = abs(box2d[0] - box2d[2])/IMAGE_WIDTH
                         x_c = (box2d[0] + abs(box2d[0] - box2d[2])/2)/IMAGE_WIDTH
                         y_c = (box2d[1] + abs(box2d[1] - box2d[3])/2)/IMAGE_HEIGH
-                        objects_on_frames.append([frame_name, x_c, y_c, w, h, 1, 1])
+                        objects_on_frames.append([frame_name, x_c, y_c, w, h, 0, 1])
                 if('Pedestrian' in frame):
                     for obj in frame['Pedestrian']:
                         box2d = obj['box2d']
@@ -40,7 +40,7 @@ for (idx, fold) in enumerate(folds):
                         w = abs(box2d[0] - box2d[2])/IMAGE_WIDTH
                         x_c = (box2d[0] + abs(box2d[0] - box2d[2])/2)/IMAGE_WIDTH
                         y_c = (box2d[1] + abs(box2d[1] - box2d[3])/2)/IMAGE_HEIGH
-                        objects_on_frames.append([frame_name, x_c, y_c, w, h, 0, 1])
+                        objects_on_frames.append([frame_name, x_c, y_c, w, h, 1, 1])
 
     df = pd.DataFrame(data=objects_on_frames, columns=['filename', 'x_c', 'y_c', 'w', 'h', 'class_label', 'confidence'])
-    df.to_csv(f'../data/folds/fold_{idx+1}.csv')
+    df.to_csv(f'../data/folds/fold_{idx+1}.csv',index=False)
