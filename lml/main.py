@@ -11,6 +11,19 @@ import pandas as pd
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+IMG_WIDTH = 1936
+IMG_HEIGHT = 1216
+
+
+def detected_object_name(obj):
+    left = (obj[1]-obj[3]/2)*IMG_WIDTH
+    right = (obj[1]+obj[3]/2)*IMG_WIDTH
+    top = (obj[2]-obj[4]/2)*IMG_HEIGHT
+    bottom = (obj[2]+obj[4]/2)*IMG_HEIGHT
+
+    return f'{left:.6f}_{top:.6f}_{right:.6f}_{bottom:.6f}'
+
+
 '''
 This is main function
 It can be called in loop for different data
@@ -61,7 +74,9 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
 
             frames_count = len(files)
 
-        # Live traking
+        '''
+        Live traking
+        '''
         with tqdm(total=frames_count, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') as pbar:
             for (idx, file) in enumerate(files):
                 detected_classes = np.empty((0, 5), dtype=np.float32)
@@ -128,19 +143,16 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                     temp_linked = [cl for cl in linked_data if cl._class == 0 and cl._tracking]
                     temp_detected = np.array([cl for cl in detected_classes if cl[0] == 0])
 
-                    '''
-                    Linking objects
-                    '''
                     for (i, row) in enumerate(row_ind):
                         if(xgb_save):
-                            for k in range(temp_detected.shape[0]):
-                                out_res.append(
-                                    [video,
-                                     frame_idx,
-                                     frame_idx + 1,
-                                     temp_linked[row]._name,
-                                     f"{temp_detected[k,1]-temp_detected[k,3]/2:.6f}_{temp_detected[k,2]-temp_detected[k,4]/2:.6f}_{temp_detected[k,1]+temp_detected[k,3]/2:.6f}_{temp_detected[k,2]+temp_detected[k,4]/2:.6f}",
-                                     1 if col_ind[i] == k else 0])
+                            for k in range(detected_classes.shape[0]):
+                                if(np.array_equal(detected_classes[k, :],temp_detected[col_ind[i], :])):
+                                    prediction = 1
+                                else:
+                                    prediction = 0
+
+                                out_res.append([video, frame_idx-1, frame_idx, temp_linked[row]._name,
+                                               detected_object_name(detected_classes[k, :]), prediction])
 
                         _x = temp_detected[col_ind[i], 1]
                         _y = temp_detected[col_ind[i], 2]
@@ -155,14 +167,9 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                     for i in range(len(temp_linked)):
                         if(not (i in row_ind)):
                             if(xgb_save):
-                                for k in range(temp_detected.shape[0]):
-                                    out_res.append(
-                                        [video,
-                                         frame_idx,
-                                         frame_idx + 1,
-                                         temp_linked[row]._name,
-                                         f"{temp_detected[k,1]-temp_detected[k,3]/2:.6f}_{temp_detected[k,2]-temp_detected[k,4]/2:.6f}_{temp_detected[k,1]+temp_detected[k,3]/2:.6f}_{temp_detected[k,2]+temp_detected[k,4]/2:.6f}",
-                                         0])
+                                for k in range(detected_classes.shape[0]):
+                                    out_res.append([video, frame_idx-1, frame_idx, temp_linked[i]._name,
+                                                   detected_object_name(detected_classes[k, :]), 0])
                             temp_linked[i].lost()
 
                     delete_idx = []
@@ -189,18 +196,15 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
 
                     for (i, row) in enumerate(row_ind):
                         if(xgb_save):
-                            for k in range(temp_detected.shape[0]):
-                                out_res.append(
-                                    [video,
-                                     frame_idx,
-                                     frame_idx + 1,
-                                     temp_linked[row]._name,
-                                     f"{temp_detected[k,1]-temp_detected[k,3]/2:.6f}_{temp_detected[k,2]-temp_detected[k,4]/2:.6f}_{temp_detected[k,1]+temp_detected[k,3]/2:.6f}_{temp_detected[k,2]+temp_detected[k,4]/2:.6f}",
-                                     1 if col_ind[i] == k else 0])
+                            for k in range(detected_classes.shape[0]):
+                                if(np.array_equal(detected_classes[k, :], temp_detected[col_ind[i], :])):
+                                    prediction = 1
+                                else:
+                                    prediction = 0
 
-                        '''
-                        Linking object
-                        '''
+                                out_res.append([video, frame_idx-1, frame_idx, temp_linked[row]._name,
+                                               detected_object_name(detected_classes[k, :]), prediction])
+
                         _x = temp_detected[col_ind[i], 1]
                         _y = temp_detected[col_ind[i], 2]
                         _w = temp_detected[col_ind[i], 3]
@@ -213,14 +217,9 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                     for i in range(len(temp_linked)):
                         if(not (i in row_ind)):
                             if(xgb_save):
-                                for k in range(temp_detected.shape[0]):
-                                    out_res.append(
-                                        [video,
-                                         frame_idx,
-                                         frame_idx + 1,
-                                         temp_linked[row]._name,
-                                         f"{temp_detected[k,1]-temp_detected[k,3]/2:.6f}_{temp_detected[k,2]-temp_detected[k,4]/2:.6f}_{temp_detected[k,1]+temp_detected[k,3]/2:.6f}_{temp_detected[k,2]+temp_detected[k,4]/2:.6f}",
-                                         0])
+                                for k in range(detected_classes.shape[0]):
+                                    out_res.append([video, frame_idx-1, frame_idx, temp_linked[i]._name,
+                                                   detected_object_name(detected_classes[k, :]), 0])
                             temp_linked[i].lost()
 
                     delete_idx = []
@@ -273,7 +272,7 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
         After end of video, remove predictions for objects,
         that wasn't found
         '''
-        for in_frame_obj in linked_data:
+        for (idx, in_frame_obj) in enumerate(linked_data):
             if(in_frame_obj._lost and in_frame_obj._lost_frames > 0):
                 in_frame_obj._x_c = in_frame_obj._x_c[:-1*in_frame_obj._lost_frames]
                 in_frame_obj._y_c = in_frame_obj._y_c[:-1*in_frame_obj._lost_frames]
@@ -329,7 +328,7 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
 
             with tqdm(total=frames_count, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') as pbar:
                 for i in range(frames_count):
-                    frame_objects = df[df['frame1'] == i+1]['obj_1'].to_numpy()
+                    frame_objects = df[df['frame1'] == i]['obj_1'].to_numpy()
 
                     for k in range(i+10):
                         sub_frame = df[df['frame2'] == k+1]
@@ -337,9 +336,17 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
 
                         for line in sub_frame:
                             if line[3] in frame_objects:
+                              
                                 obj_1 = [obj for obj in linked_data if obj._name == line[3]][0]
-                                name_1 = f"{obj_1._x_c[i]-obj_1._b_w[i]/2:.6f}_{obj_1._y_c[i]-obj_1._b_h[i]/2:.6f}_{obj_1._x_c[i]+obj_1._b_w[i]/2:.6f}_{obj_1._y_c[i]+obj_1._b_h[i]/2:.6f}"
-                                fixed_data.append([line[0], i+1, k+1, name_1, line[4], line[5]])
+                                
+                                if(obj_1._x_c.shape[0]-1>=i):
+                                    left = (obj_1._x_c[i]-obj_1._b_w[i]/2)*IMG_WIDTH
+                                    right = (obj_1._x_c[i]+obj_1._b_w[i]/2)*IMG_WIDTH
+                                    top = (obj_1._y_c[i]-obj_1._b_h[i]/2)*IMG_HEIGHT
+                                    bottom = (obj_1._y_c[i]+obj_1._b_h[i]/2)*IMG_HEIGHT
+
+                                    name_1 = f"{left:.6f}_{top:.6f}_{right:.6f}_{bottom:.6f}"
+                                    fixed_data.append([line[0], i, k, name_1, line[4], line[5]])
                     pbar.update(1)
                 pbar.close()
 
@@ -356,7 +363,7 @@ if __name__ == '__main__':
     folds = ['fold_1', 'fold_2', 'fold_3', 'fold_4']
 
     videos = [
-        # ["train_06", "train_07", "train_10", "train_14", "train_19"],
+        ["train_06", "train_07", "train_10", "train_14", "train_19"],
         ["train_17", "train_18", "train_20", "train_21", "train_24"],
         ["train_02", "train_03", "train_04", "train_12", "train_15"],
         ["train_01", "train_05", "train_09", "train_13", "train_22"],
@@ -364,7 +371,7 @@ if __name__ == '__main__':
     ]
 
     res_json = [
-        # {'train_06.mp4': [], 'train_07.mp4': [],'train_10.mp4': [],'train_14.mp4': [],'train_19.mp4': []},
+        {'train_06.mp4': [], 'train_07.mp4': [],'train_10.mp4': [],'train_14.mp4': [],'train_19.mp4': []},
         {'train_17.mp4': [], 'train_18.mp4': [], 'train_20.mp4': [], 'train_21.mp4': [], 'train_24.mp4': []},
         {'train_02.mp4': [], 'train_03.mp4': [], 'train_04.mp4': [], 'train_12.mp4': [], 'train_15.mp4': []},
         {'train_01.mp4': [], 'train_05.mp4': [], 'train_09.mp4': [], 'train_13.mp4': [], 'train_22.mp4': []},
@@ -373,28 +380,31 @@ if __name__ == '__main__':
 
     all_xgb_data = []
 
-    for idx in range(len(folds)):
-        val_data, xgb_data = lml(model_path=f'./lstm/models/fold_{idx+1}/last.pt',
-                                 data_path=f'./data/folds/fold_{idx+1}.csv',
-                                 videos=videos[idx],
-                                 res_json=res_json[idx],
+    for (idx,fold) in enumerate(folds):
+        val_data = lml(model_path=f'./lstm/models/{fold}/last.pt',
+                                 data_path=f'./data/folds/0.csv',
+                                 videos=videos[0],
+                                 res_json=res_json[0],
                                  val_save=True,
-                                 xgb_save=True)
+                                 xgb_save=False)
 
-        all_xgb_data += xgb_data
+        # all_xgb_data += xgb_data
 
         '''
         Save validation data for every fold
         '''
-        if(not os.path.exists(f'./validation/fold_{idx+1}')):
-            os.mkdir(f'./validation/fold_{idx+1}')
+        if(not os.path.exists('./validation')):
+            os.mkdir('./validation')
 
-        with open(f'./validation/fold_{idx+1}/val.json', 'w') as f:
+        if(not os.path.exists(f'./validation/{fold}')):
+            os.mkdir(f'./validation/{fold}')
+
+        with open(f'./validation/{fold}/val.json', 'w') as f:
             f.write(json.dumps(val_data))
 
     '''
     Save xgboost data fromat
     '''
-    df = pd.DataFrame(data=all_xgb_data, columns=['video_name', 'frame1', 'frame2', 'obj_1', 'obj_2', 'predict'])
+    # df = pd.DataFrame(data=all_xgb_data, columns=['video_name', 'frame1', 'frame2', 'obj_1', 'obj_2', 'predict'])
     # df = df.sort_values(by=['video_name'])
-    df.to_csv('./last_xgboost.csv')
+    # df.to_csv('./last_xgboost.csv')

@@ -47,6 +47,10 @@ class Frame_Object(object):
         # self._img = img
 
     def lost(self):
+        if(self._tracking):
+            self._lost_frames += 1
+            self._lost = True
+
         if(self._tracking and (self._lost_frames >= 600 or self._x_c[self._x_c != -1].shape[0] < 3)):
             self._tracking = False
             self._x_c = self._x_c[:-self._lost_frames]
@@ -55,9 +59,7 @@ class Frame_Object(object):
             self._b_h = self._b_h[:-self._lost_frames]
             self._lost_frames = 0
 
-        if(self._tracking):
-            self._lost_frames += 1
-            self._lost = True
+
 
     def mahalanobis_distance(
             self, cl: np.float32, x: np.float32, y: np.float32, w: np.float32, h: np.float32) -> int:
