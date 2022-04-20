@@ -381,14 +381,9 @@ if __name__ == '__main__':
     all_xgb_data = []
 
     for (idx,fold) in enumerate(folds):
-        val_data, xgb_data = lml(model_path=f'./lstm/models/{fold}/last.pt',
-                                 data_path=f'./data/folds/0.csv',
-                                 videos=videos[0],
-                                 res_json=res_json[0],
-                                 val_save=True,
-                                 xgb_save=False)
+        val_data = lml(model_path=f'./lstm/models/{fold}/last.pt',
 
-        all_xgb_data += xgb_data
+        # all_xgb_data += xgb_data
 
         '''
         Save validation data for every fold
@@ -405,6 +400,7 @@ if __name__ == '__main__':
     '''
     Save xgboost data fromat
     '''
-    df = pd.DataFrame(data=all_xgb_data, columns=['video_name', 'frame1', 'frame2', 'obj_1', 'obj_2', 'predict'])
-    df = df.sort_values(by=['video_name'])
-    df.to_csv('./last_xgboost.csv')
+                       
+    # df = pd.DataFrame(data=all_xgb_data, columns=['video_name', 'frame1', 'frame2', 'obj_1', 'obj_2', 'predict'])
+    # df = df.sort_values(by=['video_name'])
+    # df.to_csv('./last_xgboost.csv')
