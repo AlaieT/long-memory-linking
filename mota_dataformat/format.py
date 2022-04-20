@@ -2,6 +2,20 @@ import os
 import json
 import re
 from tqdm import tqdm
+'''
+Folder tree
+data
+|----MOT15
+|   |-----test
+|   |-----train
+|   |     |----det
+|   |     |    |---det.txt
+|   |     |----gt
+|   |     |    |---gt.txt
+|   |     |----img1
+|   |     |    |---0000001.jpg
+|   |     |----seqinfo.ini
+'''
 
 mots = ['MOT15', 'MOT16', 'MOT17', 'MOT20']
 
