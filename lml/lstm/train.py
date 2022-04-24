@@ -7,22 +7,18 @@ import matplotlib.pyplot as plt
 from utils.get_data_from import get_data_from
 from model import LSTM
 from tqdm import tqdm
-import torch.nn.functional as F
-
-# -----------------------------------------------------------------------------
-# -----------------------------Train process-----------------------------------
-# -----------------------------------------------------------------------------
 
 
 # Train and valid data
-# objects_train, _ = get_data_from('./data/train', 'train')
-# objects_valid, _ = get_data_from('./data/valid', 'valid')
-# model_lstm = LSTM()
-# criterion = nn.L1Loss()
-# optimiser = optim.Adam(model_lstm.parameters(), lr=1e-3)
+objects_train = get_data_from(path='./data/mot/train', mod='train', folds=None)
+objects_valid = get_data_from(path='./data/mot/valid', mod='valid', folds=None)
+
+model_lstm = LSTM()
+criterion = nn.L1Loss()
+optimiser = optim.Adam(model_lstm.parameters(), lr=1e-3)
 
 
-def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data, save_path):
+def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data, save_path, metrick_path):
 
     loss_val = []
     loss_train = []
@@ -100,7 +96,6 @@ def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data, sa
                         wh = np.sqrt((real_xy[0, 0, 2]-out_xy[2])**2+(real_xy[0, 0, 3]-out_xy[3])**2)
                         mean_dx = np.append(mean_dx, dx)
                         mean_wh = np.append(mean_wh, wh)
-
                     pbar_val.update(1)
                 pbar_val.close()
 
@@ -123,36 +118,30 @@ def training_loop(n_epochs, model, optimiser, loss_fn, train_data, test_data, sa
                     os.mkdir(f'{save_path}')
                 torch.save(model.state_dict(), f'{save_path}/last.pt')
 
-    return loss_train, loss_val, dx_fr
+    '''
+    Save metrick of current model
+    '''
+    if(not os.path.exists(f'{metrick_path}/mot')):
+        os.mkdir(f'{metrick_path}/mot')
+
+    fig, axs = plt.subplots(3, 1, figsize=(18, 18))
+    fig.tight_layout()
+
+    axs[0].plot(np.linspace(0, len(loss_train), len(loss_train)), loss_train)
+    axs[0].set_title('Loss Train')
+    axs[0].grid()
+
+    axs[1].plot(np.linspace(0, len(loss_val), len(loss_val)), loss_val)
+    axs[1].set_title('Loss Val')
+    axs[1].grid()
+
+    axs[2].plot(np.linspace(0, len(dx_fr), len(dx_fr)), dx_fr)
+    axs[2].set_title('Dx')
+    axs[2].grid()
+
+    plt.savefig(f"{metrick_path}/metricks.png", dpi=250)
+    plt.close()
 
 
-# loss_train, loss_val, dx_fr = training_loop(
-#     n_epochs=20, model=model_lstm, optimiser=optimiser, loss_fn=criterion, train_data=objects_train,
-#     test_data=objects_valid, save_path='./models')
-
-# -----------------------------------------------------------------------------
-# ------------------------------Save metrick data------------------------------
-# -----------------------------------------------------------------------------
-
-# Create a visualization
-
-# if(not os.path.exists('./metricks')):
-#     os.mkdir('./metricks')
-
-# fig, axs = plt.subplots(3, 1, figsize=(18, 18))
-# fig.tight_layout()
-
-# axs[0].plot(np.linspace(0, len(loss_train), len(loss_train)), loss_train)
-# axs[0].set_title('Loss Train')
-# axs[0].grid()
-
-# axs[1].plot(np.linspace(0, len(loss_val), len(loss_val)), loss_val)
-# axs[1].set_title('Loss Val')
-# axs[1].grid()
-
-# axs[2].plot(np.linspace(0, len(dx_fr), len(dx_fr)), dx_fr)
-# axs[2].set_title('Dx')
-# axs[2].grid()
-
-# plt.savefig(f"./metricks/metricks.png", dpi=250)
-# plt.close()
+training_loop(n_epochs=20, model=model_lstm, optimiser=optimiser, loss_fn=criterion, train_data=objects_train,
+              test_data=objects_valid, save_path='./models/mot', metrick_path='./metricks/mot')

@@ -28,3 +28,11 @@
 # macOS shit
 **/*.DS_Store
 
+# -csv
+**/*.csv
+
+#-txt
+**/*.txt
+
+#-ini
+**/*.ini

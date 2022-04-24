@@ -1,11 +1,7 @@
-import numpy as np
 from torch import nn, optim
-import os
-import matplotlib.pyplot as plt
 from utils.get_data_from import get_data_from
 from model import LSTM
 from train import training_loop
-import torch.nn.functional as F
 
 folds = [
     # ["train_06", "train_07", "train_10", "train_14", "train_19"],
@@ -27,32 +23,12 @@ for (idx, fold) in enumerate(folds):
     del train_folds[idx]
     train_folds = [item for sublist in train_folds for item in sublist]
 
-    objects_train, _ = get_data_from('./data', train_folds, 'train')
-    objects_valid, _ = get_data_from('./data', fold, 'valid')
+    objects_train = get_data_from(path='./data/signate', folds=train_folds, mod='train')
+    objects_valid = get_data_from(path='./data/signate', folds=fold, mod='valid')
 
-    loss_train, loss_val, dx_fr = training_loop(
+    training_loop(
         n_epochs=20, model=model_lstm, optimiser=optimiser, loss_fn=criterion, train_data=objects_train,
-        test_data=objects_valid, save_path=f'./models/fold_{idx+1}')
+        test_data=objects_valid, save_path=f'./models/signate/fold_{idx+1}',
+        metrick_path=f'./metricks/signate/fold_{idx+1}')
 
-    if(not os.path.exists(f'./metricks/fold_{idx+1}')):
-        os.mkdir(f'./metricks/fold_{idx+1}')
-
-    fig, axs = plt.subplots(3, 1, figsize=(18, 18))
-    fig.tight_layout()
-
-    axs[0].plot(np.linspace(0, len(loss_train), len(loss_train)), loss_train)
-    axs[0].set_title('Loss Train')
-    axs[0].grid()
-
-    axs[1].plot(np.linspace(0, len(loss_val), len(loss_val)), loss_val)
-    axs[1].set_title('Loss Val')
-    axs[1].grid()
-
-    axs[2].plot(np.linspace(0, len(dx_fr), len(dx_fr)), dx_fr)
-    axs[2].set_title('Dx')
-    axs[2].grid()
-
-    plt.savefig(f"./metricks/fold_{idx+1}/metricks.png", dpi=250)
-    plt.close()
-
-    print(f'\n----------------------------------------------> END-FOLD-{idx+1}\n')
+print(f'\n----------------------------------------------> END-FOLD-{idx+1}\n')
