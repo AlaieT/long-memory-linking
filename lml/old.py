@@ -5,14 +5,23 @@ from utils.frame_object import Frame_Object
 import json
 from lstm.predict import predict
 from lstm.model import LSTM
+from siamese.model import SiameseModel
 import torch
 from scipy.optimize import linear_sum_assignment
 import pandas as pd
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+from PIL import Image
+import torch
+from torchvision import transforms
 
 IMG_WIDTH = 1936
 IMG_HEIGHT = 1216
+
+
+def to_tensor(img):
+    transform = transforms.ToTensor()
+    tensor = transform(img)
+    tensor = tensor.unsqueeze(0).cuda()
+    return tensor
 
 
 def detected_object_name(obj):
@@ -35,6 +44,14 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
     model_lstm = LSTM()
     model_lstm.load_state_dict(torch.load(f'{model_path}'))
     model_lstm.eval()
+
+    model_siamese = SiameseModel()
+    model_siamese.load_state_dict(torch.load('./siamese/models/last.pt'))
+    model_siamese.cuda()
+    model_siamese.eval()
+
+    # Set siamese model for entire class
+    Frame_Object.set_model(model_siamese)
 
     fixed_data = []  # xgboost formated data
 
@@ -66,7 +83,7 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
             for i in range(frames_count):
                 temp_csv = df.loc[df['filename'] == f'{video}-{"0"*(3 - len(str(i)))}{i}']
                 temp_csv = temp_csv[temp_csv['confidence'] >= 0.75]
-                temp_csv_new = temp_csv.drop(['filename', 'confidence'], 1)
+                temp_csv_new = temp_csv.drop(['confidence'], 1)
                 files.append(temp_csv_new.values.tolist())
 
         '''
@@ -74,21 +91,28 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
         '''
         with tqdm(total=frames_count, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') as pbar:
             for (idx, file) in enumerate(files):
-                detected_classes = np.empty((0, 5), dtype=np.float32)
+                detected_classes = np.empty((0, 6), dtype=np.float32)
+                detected_images = []
 
                 '''
                 Get objects from new(current) frame
                 '''
                 for obj in file:
-                    _class = int(obj[4])
-                    _x = float(obj[0])
-                    _y = float(obj[1])
-                    _w = float(obj[2])
-                    _h = float(obj[3])
+                    _class = int(obj[5])
+                    _x = float(obj[1])
+                    _y = float(obj[2])
+                    _w = float(obj[3])
+                    _h = float(obj[4])
 
-                    if(_w*_h*IMG_WIDTH*IMG_HEIGHT>=1024):
-                        new_data = np.empty((1, 5))
-                        new_data[0:] = np.array([_class, _x, _y, _w, _h], dtype=np.float32)
+                    if(_w*_h*IMG_WIDTH*IMG_HEIGHT >= 1024):
+                        frame_img = Image.open('./data/images/{}/{}.png'.format(obj[0][:-4], obj[0]))
+                        img = to_tensor(frame_img.crop(((_x -_w/2)*IMG_WIDTH, (_y-_h/2)*IMG_HEIGHT,
+                                                       (_x+_w/2)*IMG_WIDTH, (_y+_h/2)*IMG_HEIGHT)).resize((64, 64)))
+
+                        detected_images.append(img)
+
+                        new_data = np.empty((1, 6))
+                        new_data[0:] = np.array([_class, _x, _y, _w, _h, len(detected_images)-1], dtype=np.float32)
 
                         if(detected_classes.shape == 0):
                             detected_classes = np.expand_dims(detected_classes, axis=0)
@@ -117,7 +141,8 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                             detected_classes[:, 1],
                             detected_classes[:, 2],
                             detected_classes[:, 3],
-                            detected_classes[:, 4])
+                            detected_classes[:, 4],
+                            detected_images)
 
                         if(in_frame_obj._class == 0):
                             all_dx_0[am_0, :] = np.array(obj_dx)
@@ -151,8 +176,9 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                         _y = temp_detected[col_ind[i], 2]
                         _w = temp_detected[col_ind[i], 3]
                         _h = temp_detected[col_ind[i], 4]
+                        _img = detected_images[int(temp_detected[col_ind[i], 5])]
 
-                        temp_linked[row].update_state(_x, _y, _w, _h,)
+                        temp_linked[row].update_state(_x, _y, _w, _h, _img)
 
                     '''
                     Losing objects
@@ -201,9 +227,9 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                         _x = temp_detected[col_ind[i], 1]
                         _y = temp_detected[col_ind[i], 2]
                         _w = temp_detected[col_ind[i], 3]
-                        _h = temp_detected[col_ind[i], 4]
+                        _img = detected_images[int(temp_detected[col_ind[i], 5])]
 
-                        temp_linked[row].update_state(_x, _y, _w, _h)
+                        temp_linked[row].update_state(_x, _y, _w, _h, _img)
                     '''
                     Losing objects
                     '''
@@ -240,6 +266,7 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                         detected_classes[k, 2],
                         detected_classes[k, 3],
                         detected_classes[k, 4],
+                        detected_images[int(detected_classes[k, 5])],
                         frame_idx)
 
                     linked_data = np.append(linked_data, new_object)
@@ -354,10 +381,10 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
 if __name__ == '__main__':
 
     # videos = [["train_06", "train_07", "train_10", "train_14", "train_19"]]
-    videos = [["train_06", "train_19"]]
+    videos = [["train_06"]]
 
     # res_json = [{"train_06.mp4": [], "train_07.mp4":[], "train_10.mp4":[], "train_14.mp4":[], "train_19.mp4":[]}]
-    res_json = [{"train_06.mp4": [], "train_19.mp4":[]}]
+    res_json = [{"train_06.mp4": [] }]
 
     all_xgb_data = []
 
