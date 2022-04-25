@@ -1,40 +1,51 @@
-from math import floor
-import random
+from math import ceil, floor
 from torch.nn import Module
 from utils.get_data_from import GetDataFrom
+import numpy as np
+from tqdm import tqdm
 
 
 class SiameseDataset(Module):
-    def __init__(self, mode='train', anno_path=None, images_path=None, resize_shape=None, transforms=None) -> None:
+    def __init__(self, mode='train', anno_path=None, images_path=None, reshape=None,  transforms=None) -> None:
 
-        getter = GetDataFrom(mode, anno_path, images_path, resize_shape, transforms)
-        anchor_collection, positive_collection = getter.get_full_data()
+        getter = GetDataFrom(mode, anno_path, images_path, reshape, transforms)
+        positive_collection = getter.get_full_data()
 
-        self.__anchor_collection = []
-        self.__positive_collection = []
-        self.__negative_collection = []
+        self.__left_collection = []
+        self.__right_collection = []
 
-        for (idx, anchor) in enumerate(anchor_collection):
-            if(len(positive_collection[idx]) >= 5):
-                for k in range(floor(len(positive_collection[idx])/5)):
-                    self.__anchor_collection += [anchor for p in range(5)]
-                    self.__positive_collection += positive_collection[idx][5*k:(k+1)*5]
-                    break
-        self.__negative_collection = self.__positive_collection.copy()
-        random.shuffle(self.__negative_collection)
+        print('\nCreateing pairs...\n')
 
-        print('\nDataset - Anchor size: {}, Positive size: {} in {} mode\n'.format(
-            len(self.__anchor_collection),
-            len(self.__positive_collection),
+        with tqdm(total=len(positive_collection), bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') as pbar:
+            for collection in positive_collection:
+                if(len(collection) >= 2):
+                    temp_left = collection[1:]
+                    temp_right = collection[:-1]
+
+                    for k in range(len(collection)-1):
+                        self.__left_collection.append(temp_left[k])
+                        self.__right_collection.append(temp_right[k])
+                pbar.update(1)
+            pbar.close()
+
+        size_full = len(self.__right_collection)
+        size_right = ceil(len(self.__right_collection)/2)
+
+        self.__right_collection = self.__right_collection[:size_right] + self.__right_collection[size_right+floor(
+            size_right/2):] + self.__right_collection[size_right:size_right+floor(size_right/2)]
+
+        self.__labels = np.array([1 for i in range(size_right)] +
+                                 [0 for i in range(size_full - size_right)], dtype=np.float32)
+        self.__labels = self.__labels.reshape((self.__labels.shape[0], 1))
+
+        print('\nDataset - Left size: {}, Right size: {}, Labels: {} in {} mode\n'.format(
+            len(self.__left_collection),
+            len(self.__right_collection),
+            len(self.__labels),
             mode))
 
-        # Clear memory
-        anchor_collection.clear()
-        positive_collection.clear()
-        getter = None
-
     def __len__(self):
-        return len(self.__anchor_collection)
+        return len(self.__left_collection)
 
     def __getitem__(self, idx):
-        return self.__anchor_collection[idx], self.__positive_collection[idx], self.__negative_collection[idx]
+        return self.__left_collection[idx], self.__right_collection[idx], self.__labels[idx]
