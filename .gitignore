@@ -28,6 +28,16 @@
 # macOS shit
 **/*.DS_Store
 
+
+# -csv
+**/*.csv
+
+#-txt
+**/*.txt
+
+#-ini
+**/*.ini
+
 # py cache
 **/__pycache__
 
