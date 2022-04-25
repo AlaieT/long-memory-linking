@@ -35,7 +35,7 @@ class SiameseDataset(Module):
             size_right/2):] + self.__right_collection[size_right:size_right+floor(size_right/2)]
 
         self.__labels = np.array([1 for i in range(size_right)] +
-                                 [0 for i in range(size_full - size_right)], dtype=np.float32)
+                                 [-1 for i in range(size_full - size_right)], dtype=np.float32)
         self.__labels = self.__labels.reshape((self.__labels.shape[0], 1))
 
         print('\nDataset - Left size: {}, Right size: {}, Labels: {} in {} mode\n'.format(

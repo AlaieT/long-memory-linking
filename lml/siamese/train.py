@@ -101,11 +101,11 @@ def train_loop(epochs, train_data, valid_data, model, loss_function, optimizer):
             print(f'\n{out_mse[-10:]}')
             print(real_mse[-10:])
 
-            round_real = np.round(real_mse)
+            round_real = np.round(real_mse/2+0.5)
             round_pred = np.round(out_mse)
 
             accuracy = accuracy_score(round_real, round_pred)
-            roc_auc = roc_auc_score(real_mse, out_mse)
+            roc_auc = roc_auc_score(real_mse/2+0.5, out_mse)
 
             print('\nPred zeros count: {}, Real zeros count: {}\n'.format(
                 len(round_pred[round_pred != 1]), len(round_real[round_real != 1])))
