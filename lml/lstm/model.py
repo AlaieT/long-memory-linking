@@ -17,19 +17,19 @@ class LSTM(nn.Module):
         self.lstmf = nn.LSTMCell(4, self.hidden_layers)
         self.lstmb = nn.LSTMCell(4, self.hidden_layers)
 
-        self.linear1 = nn.Linear(self.hidden_layers*2, 1)
-        self.linear2 = nn.Linear(self.hidden_layers*2, 1)
-        self.linear3 = nn.Linear(self.hidden_layers*2, 1)
-        self.linear4 = nn.Linear(self.hidden_layers*2, 1)
-        self.sigm = nn.Sigmoid()
+        self.post = nn.Sequential(nn.utils.weight_norm(nn.Linear(self.hidden_layers*2, self.hidden_layers*4), dim=None),
+                                  nn.Dropout(p=0.2),
+                                  nn.utils.weight_norm(nn.Linear(self.hidden_layers*4, self.hidden_layers*2)),
+                                  nn.utils.weight_norm(nn.Linear(self.hidden_layers*2,4)), nn.Sigmoid())
+
 
     def forward(self, y):
         outputs, num_samples = torch.tensor([]), y.size(0)
-        h_tf = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32)
-        c_tf = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32)
+        h_tf = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32).cuda()
+        c_tf = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32).cuda()
 
-        h_tb = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32)
-        c_tb = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32)
+        h_tb = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32).cuda()
+        c_tb = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32).cuda()
 
         f_y = y.split(1, dim=1)
         b_y = torch.flip(y, dims=[1]).split(1, dim=1)
@@ -46,15 +46,7 @@ class LSTM(nn.Module):
 
         h_tr = torch.cat((h_tf, h_tb), dim=1)
 
-        _x = self.linear1(h_tr)
-        _y = self.linear2(h_tr)
-        _w = self.linear3(h_tr)
-        _h = self.linear4(h_tr)
-
-        output = torch.cat((_x, _y, _w, _h), dim=1)
-
-        output = self.sigm(output)
-
-        outputs = output.clone().unsqueeze(1)
+        out = self.post(h_tr)
+        outputs = out.clone().unsqueeze(1)
 
         return outputs

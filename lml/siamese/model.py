@@ -1,3 +1,4 @@
+from pyexpat import model
 import torch
 import torch.nn as nn
 from torch.nn import Module
@@ -11,7 +12,9 @@ class SiameseModel(Module):
 
         self.emb_size = 256
 
-        self.backbone = timm.create_model('efficientnet_b0', pretrained=True)
+        # self.backbone = timm.create_model('eca_nfnet_l0', pretrained=True)
+        self.backbone = timm.create_model('mobilenetv3_large_100', pretrained=True)
+        # self.backbone = timm.create_model('efficientnet_b0', pretrained=True)
         in_features = self.backbone.get_classifier().in_features
 
         fc_name, _ = list(self.backbone.named_modules())[-1]
@@ -29,15 +32,19 @@ class SiameseModel(Module):
         else:
             raise Exception('Unknown classifier layer: ' + fc_name)
 
-        self.cosine = nn.CosineSimilarity()
         self.post = nn.Sequential(nn.utils.weight_norm(nn.Linear(in_features, self.emb_size*2), dim=None),
                                   nn.BatchNorm1d(self.emb_size*2),
                                   nn.Dropout(p=0.2),
                                   nn.utils.weight_norm(nn.Linear(self.emb_size*2, self.emb_size)),
-                                  nn.BatchNorm1d(self.emb_size))
+                                  nn.BatchNorm1d(self.emb_size),
+                                  nn.utils.weight_norm(nn.Linear(self.emb_size,1)), nn.Sigmoid())
 
     def forward(self, first, second):
-        out1 = self.post(self.backbone(first))
-        out2 = self.post(self.backbone(second))
+        out1 = self.backbone(first)
+        out2 = self.backbone(second)
 
-        return out1, out2
+        dis = torch.abs(out1 - out2)
+
+        out = self.post(dis)
+
+        return out

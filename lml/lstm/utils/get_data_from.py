@@ -23,7 +23,7 @@ def to_tensor(data):
     data = data
     samples = np.empty((1, len(data), 4), dtype=np.float32)
     samples[0, :, :] = np.array(data, dtype=np.float32)
-    samples = torch.tensor(samples.reshape((1, samples.shape[1], 4)))
+    samples = torch.tensor(samples.reshape((1, samples.shape[1], 4))).cuda()
 
     return samples
 
@@ -50,10 +50,10 @@ def get_data_from(path: str, folds: list, mod: str):
             with open(f'{path}/{file}') as f:
                 json_file = json.load(f)
 
-                if('annotations' in json_file):
-                    ann = json_file['annotations']
-                    img_width = ann['imgWidth']
-                    img_height = ann['imgHeight']
+                # if('annotations' in json_file):
+                #     ann = json_file['annotations']
+                #     img_width = ann['imgWidth']
+                #     img_height = ann['imgHeight']
 
                 true_json = json_file['sequence']
 

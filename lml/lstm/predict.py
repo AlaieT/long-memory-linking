@@ -27,9 +27,9 @@ def predict(x: np.float32, y: np.float32, w: np.float32, h: np.float32, model_: 
         sample[0, :, 2] = _w
         sample[0, :, 3] = _h
 
-        data = torch.from_numpy(sample)
+        data = torch.from_numpy(sample).cuda()
 
         pred = model_(data)
-        outs = pred.detach().numpy().reshape((4,))
+        outs = pred.cpu().detach().numpy().reshape((4,))
 
         return outs
