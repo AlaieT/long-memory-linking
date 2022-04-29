@@ -2,6 +2,7 @@ from PIL import Image
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import random
 
 class GetDataFrom:
     def __init__(self, mode='train', anno_path=None, images_path=None, reshape=None, transforms=None):
@@ -19,7 +20,8 @@ class GetDataFrom:
             annotations = pd.read_csv(self.__data_annotation_path + '/siamese_training.csv')
             # Get unique objects
             unique_image_paths = annotations.drop_duplicates(subset=['object_id']).values
-            id_collection = []
+            id_collection_people = []
+            id_collection_car = []
 
             print('\nGeting all unique objects...\n')
 
@@ -27,18 +29,21 @@ class GetDataFrom:
                 for image_path in unique_image_paths:
                     if(((image_path[0][:8] not in self.__valid) and (self.__mode == 'train'))
                        or ((image_path[0][:8] in self.__valid) and (self.__mode == 'valid'))):
-                        id_collection.append(image_path[1])
+                       if('Car' in image_path[0].split('_')):
+                           id_collection_car.append(image_path[1])
+                       if('Pedestrian' in image_path[0].split('_')):
+                           id_collection_people.append(image_path[1])
+
                     pbar.update(1)
                 pbar.close()
 
             # return image_collection, id_collection
-            return id_collection
+            return id_collection_car, id_collection_people
 
     def __get_positive_data(self, id_collection: list):
         annotations = pd.read_csv(self.__data_annotation_path + '/siamese_training.csv')
         image_collection = []
 
-        print('\nCollecting full data...\n')
 
         with tqdm(total=len(id_collection), bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') as pbar:
             for id in id_collection:
@@ -60,7 +65,10 @@ class GetDataFrom:
         return image_collection
 
     def get_full_data(self):
-        id_collection = self.__get_unique_data()
-        positive_collection = self.__get_positive_data(id_collection)
+        id_collection_car,id_collection_people = self.__get_unique_data()
+        print('\nCollecting full data of pedestrians...\n')
+        collection_people = self.__get_positive_data(id_collection_people)
+        print('\nCollecting full data of cars...\n')
+        collection_car = self.__get_positive_data(id_collection_car)
 
-        return positive_collection
+        return collection_people, collection_car
