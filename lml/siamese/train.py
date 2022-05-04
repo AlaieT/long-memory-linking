@@ -41,7 +41,7 @@ print('Current deviuce: {}\n'.format(device))
 model = SiameseModel()
 model.to(device)
 
-criterion = nn.MSELoss()
+criterion = nn.L1Loss()
 optimizer = optim.Adam(model.parameters(), lr=0.0005)
 
 

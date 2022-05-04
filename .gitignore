@@ -43,3 +43,6 @@
 
 #-csv
 **/*.csv
+
+# resused library
+**/ensemble_boxes

@@ -8,9 +8,7 @@ from lstm.model import LSTM
 import torch
 from scipy.optimize import linear_sum_assignment
 import pandas as pd
-from PIL import Image
 from torchvision import transforms
-from siamese.model import SiameseModel
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -18,22 +16,16 @@ IMG_WIDTH = 1936
 IMG_HEIGHT = 1216
 
 
-
-def to_tensor(img):
-    transform = transforms.ToTensor()
-    tensor = transform(img)
-    tensor = tensor.unsqueeze(0).cuda()
-    return tensor
-
-def fix_lin_assigm(cost_matrix,rows,cols):
+def fix_lin_assigm(cost_matrix, rows, cols):
     new_rows = []
-    new_cols= []
+    new_cols = []
 
-    for (i,row) in enumerate(rows):
-        if(cost_matrix[row,cols[i]] != 10):
+    for (i, row) in enumerate(rows):
+        if(cost_matrix[row, cols[i]] != 10):
             new_rows.append(row)
             new_cols.append(cols[i])
     return new_rows, new_cols
+
 
 def detected_object_name(obj):
     left = (obj[1]-obj[3]/2)*IMG_WIDTH
@@ -50,17 +42,11 @@ It can be called in loop for different data
 '''
 
 
-def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save: bool, xgb_save: bool):
+def lml(model_path: str, data_path: str, videos: list, res_json: list):
 
     model_lstm = LSTM().cuda()
     model_lstm.load_state_dict(torch.load(f'{model_path}'))
     model_lstm.eval()
-
-    model_siamese = SiameseModel().cuda()
-    model_siamese.load_state_dict(torch.load('./siamese/models/last.pt'))
-    model_siamese.eval()
-
-    Frame_Object.set_model(model_siamese)
 
     for video in videos:
         print(f'\n----------------------> Linking objects in video: {video}')
@@ -86,7 +72,8 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
 
             for i in range(frames_count):
                 temp_csv = df.loc[df['filename'] == f'{video}-{"0"*(3 - len(str(i)))}{i}']
-                temp_csv = temp_csv[((temp_csv['confidence'] >= 0.70) & (temp_csv['class_label'] == 1)) | ((temp_csv['confidence'] >= 0.70) & (temp_csv['class_label'] == 0))]
+                temp_csv = temp_csv[((temp_csv['confidence'] >= 0.70) & (temp_csv['class_label'] == 1)) |
+                                    ((temp_csv['confidence'] >= 0.70) & (temp_csv['class_label'] == 0))]
                 temp_csv_new = temp_csv.drop(['confidence'], 1)
                 files.append(temp_csv_new.values.tolist())
 
@@ -95,8 +82,7 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
         '''
         with tqdm(total=frames_count, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') as pbar:
             for (idx, file) in enumerate(files):
-                detected_classes = np.empty((0, 6), dtype=np.float32)
-                detected_images = []
+                detected_classes = np.empty((0, 5), dtype=np.float32)
 
                 '''
                 Get objects from new(current) frame
@@ -108,15 +94,9 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                     _w = float(obj[3])
                     _h = float(obj[4])
 
-                    if(_w*_h*IMG_WIDTH*IMG_HEIGHT>=1024):
-                        frame_img = Image.open('./data/images/{}/{}.png'.format(obj[0][:-4], obj[0]))
-                        img = to_tensor(frame_img.crop(((_x -_w/2)*IMG_WIDTH, (_y-_h/2)*IMG_HEIGHT,
-                                                       (_x+_w/2)*IMG_WIDTH, (_y+_h/2)*IMG_HEIGHT)).resize((96, 96)))
-
-                        detected_images.append(img)
-
-                        new_data = np.empty((1, 6))
-                        new_data[0:] = np.array([_class, _x, _y, _w, _h, (len(detected_images)-1)], dtype=np.float32)
+                    if(_w*_h*IMG_WIDTH*IMG_HEIGHT >= 1024):
+                        new_data = np.empty((1, 5))
+                        new_data[0:] = np.array([_class, _x, _y, _w, _h], dtype=np.float32)
 
                         if(detected_classes.shape == 0):
                             detected_classes = np.expand_dims(detected_classes, axis=0)
@@ -145,8 +125,7 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                             detected_classes[:, 1],
                             detected_classes[:, 2],
                             detected_classes[:, 3],
-                            detected_classes[:, 4],
-                            detected_images)
+                            detected_classes[:, 4])
 
                         if(in_frame_obj._class == 0):
                             all_dx_0[am_0, :] = np.array(obj_dx)
@@ -159,7 +138,7 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                 '''
                 if(all_dx_0.shape[0] > 0):
                     row_ind, col_ind = linear_sum_assignment(all_dx_0)
-                    row_ind, col_ind = fix_lin_assigm(all_dx_0,row_ind,col_ind)
+                    row_ind, col_ind = fix_lin_assigm(all_dx_0, row_ind, col_ind)
 
                     temp_linked = [cl for cl in linked_data if cl._class == 0 and cl._tracking]
                     temp_detected = np.array([cl for cl in detected_classes if cl[0] == 0])
@@ -169,9 +148,8 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                         _y = temp_detected[col_ind[i], 2]
                         _w = temp_detected[col_ind[i], 3]
                         _h = temp_detected[col_ind[i], 4]
-                        _img = detected_images[int(temp_detected[col_ind[i],5])]
 
-                        temp_linked[row].update_state(_x, _y, _w, _h, _img)
+                        temp_linked[row].update_state(_x, _y, _w, _h)
 
                     '''
                     Losing objects
@@ -192,13 +170,12 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                             am_0 += 1
                     detected_classes = np.delete(detected_classes, delete_idx, axis=0)
 
-
                 '''
                 Linking objects of car class
                 '''
                 if(all_dx_2.shape[0] > 0):
                     row_ind, col_ind = linear_sum_assignment(all_dx_2)
-                    row_ind, col_ind = fix_lin_assigm(all_dx_2,row_ind,col_ind)
+                    row_ind, col_ind = fix_lin_assigm(all_dx_2, row_ind, col_ind)
 
                     temp_linked = [cl for cl in linked_data if cl._class == 1 and cl._tracking]
                     temp_detected = np.array([cl for cl in detected_classes if cl[0] == 1])
@@ -208,18 +185,13 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                         _y = temp_detected[col_ind[i], 2]
                         _w = temp_detected[col_ind[i], 3]
                         _h = temp_detected[col_ind[i], 4]
-                        _img = detected_images[int(temp_detected[col_ind[i],5])]
 
-                        temp_linked[row].update_state(_x, _y, _w, _h,_img)
+                        temp_linked[row].update_state(_x, _y, _w, _h)
                     '''
                     Losing objects
                     '''
                     for i in range(len(temp_linked)):
                         if(not (i in row_ind)):
-                            if(xgb_save):
-                                for k in range(detected_classes.shape[0]):
-                                    out_res.append([video, frame_idx-1, frame_idx, temp_linked[i]._name,
-                                                   detected_object_name(detected_classes[k, :]), 0])
                             temp_linked[i].lost()
 
                     delete_idx = []
@@ -247,7 +219,6 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
                         detected_classes[k, 2],
                         detected_classes[k, 3],
                         detected_classes[k, 4],
-                        detected_images[int(detected_classes[k , 5])],
                         frame_idx)
 
                     linked_data = np.append(linked_data, new_object)
@@ -319,22 +290,21 @@ def lml(model_path: str, data_path: str, videos: list, res_json: list, val_save:
             if(len(frame_car) != 0 and len(frame_pedestrian) != 0):
                 res_json[f'{video}.mp4'].append({'Car': frame_car, 'Pedestrian': frame_pedestrian})
 
-
     return res_json
 
 
 if __name__ == '__main__':
 
-    # videos = [["train_06", "train_07", "train_10", "train_14", "train_19"]]
-    videos = [["train_06"]]
+    videos = [["train_06", "train_07", "train_10", "train_14", "train_19"]]
+    # videos = [["train_06"]]
 
-    # res_json = [{"train_06.mp4": [], "train_07.mp4":[], "train_10.mp4":[], "train_14.mp4":[], "train_19.mp4":[]}]
-    res_json = [{"train_06.mp4": []}]
+    res_json = [{"train_06.mp4": [], "train_07.mp4":[], "train_10.mp4":[], "train_14.mp4":[], "train_19.mp4":[]}]
+    # res_json = [{"train_06.mp4": []}]
 
     all_xgb_data = []
 
-    val_data = lml(model_path=f'./lstm/models/mot/last.pt', data_path='./data/folds/fold_0.csv',
-                   videos=videos[0], res_json=res_json[0], val_save=True, xgb_save=False)
+    val_data = lml(model_path=f'./lstm/models/mot/best.pt', data_path='./data/folds/fold_0.csv',
+                   videos=videos[0], res_json=res_json[0])
 
     if(not os.path.exists('./validation')):
         os.mkdir('./validation')

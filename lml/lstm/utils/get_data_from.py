@@ -5,6 +5,7 @@ import os
 import json
 import numpy as np
 import torch
+from tqdm import tqdm
 
 # -----------------------------------------------------------------------------
 # ----------------------------Load and parse data------------------------------
@@ -19,13 +20,17 @@ def natural_keys(text):
     return [atoi(c) for c in re.split(r'(\d+)', text)]
 
 
-def to_tensor(data):
-    data = data
-    samples = np.empty((1, len(data), 4), dtype=np.float32)
-    samples[0, :, :] = np.array(data, dtype=np.float32)
-    samples = torch.tensor(samples.reshape((1, samples.shape[1], 4))).cuda()
+def to_tensor(data, device):
+    exit_data = []
 
-    return samples
+    for i in range(len(data)-2):
+        samples = np.empty((1, i+2, 4), dtype=np.float32)
+        samples[0, :, :] = np.array(data[:(i+2)], dtype=np.float32)
+        samples = torch.tensor(samples.reshape((1, samples.shape[1], 4))).to(device)
+
+        exit_data.append(samples)
+
+    return exit_data
 
 
 img_width = 1936
@@ -34,7 +39,7 @@ img_height = 1216
 TYPES = ['Car', 'Pedestrian']
 
 
-def get_data_from(path: str, folds: list, mod: str):
+def get_data_from(path: str, folds: list, device, mod: str):
     objects_id = []
     objects_on_frames = []
     splited_data = []
@@ -46,14 +51,15 @@ def get_data_from(path: str, folds: list, mod: str):
         else:
             folds = os.listdir(path)
 
+        print(f'\nPrepaing {mod} data...\n')
         for file in folds:
             with open(f'{path}/{file}') as f:
                 json_file = json.load(f)
 
-                # if('annotations' in json_file):
-                #     ann = json_file['annotations']
-                #     img_width = ann['imgWidth']
-                #     img_height = ann['imgHeight']
+                if('annotations' in json_file):
+                    ann = json_file['annotations']
+                    img_width = ann['imgWidth']
+                    img_height = ann['imgHeight']
 
                 true_json = json_file['sequence']
 
@@ -74,20 +80,18 @@ def get_data_from(path: str, folds: list, mod: str):
                                     coords = [[x_c, y_c, w, h]]
                                     objects_on_frames.append(coords)
 
-        if(mod == 'train'):
+        with tqdm(total=len(objects_on_frames), bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') as pbar:
             for i in range(len(objects_on_frames)):
-                # splited_data.append(to_tensor(objects_on_frames[i]))
-                if(len(objects_on_frames[i]) > 6 and len(objects_on_frames[i]) < 500):
-                    for k in range(0, floor(len(objects_on_frames[i])/5), 1):
-                        splited_data.append(to_tensor(objects_on_frames[i][k*2:(k+1)*5]))
+                if(len(objects_on_frames[i]) >= 11):
+                    for k in range(0, floor(len(objects_on_frames[i])/11), 1):
+                        splited_data.append(to_tensor(objects_on_frames[i][k*11:(k+1)*11], device))
+                    if(len(objects_on_frames[i]) - (k+1)*11 > 2):
+                        splited_data.append(to_tensor(objects_on_frames[i][(k+1)*11:], device))
+                else:
+                    splited_data.append(to_tensor(objects_on_frames[i], device))
 
-                    if(len(objects_on_frames[i]) - (k+1)*5 > 2):
-                        splited_data.append(to_tensor(objects_on_frames[i][(k+1)*5:]))
-
-        else:
-            splited_data = []
-            for i in range(len(objects_on_frames)):
-                splited_data.append(to_tensor(objects_on_frames[i]))
+                pbar.update(1)
+            pbar.close()
 
     random.shuffle(splited_data)
     return splited_data
