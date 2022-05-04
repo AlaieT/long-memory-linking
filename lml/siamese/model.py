@@ -12,8 +12,8 @@ class SiameseModel(Module):
 
         self.emb_size = 256
 
-        # self.backbone = timm.create_model('eca_nfnet_l0', pretrained=True)
-        self.backbone = timm.create_model('mobilenetv3_large_100', pretrained=True)
+        self.backbone = timm.create_model('eca_nfnet_l0', pretrained=True)
+        # self.backbone = timm.create_model('mobilenetv3_large_100', pretrained=True)
         # self.backbone = timm.create_model('efficientnet_b0', pretrained=True)
         in_features = self.backbone.get_classifier().in_features
 
