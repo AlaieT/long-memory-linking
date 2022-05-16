@@ -7,10 +7,6 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-# -----------------------------------------------------------------------------
-# ----------------------------Load and parse data------------------------------
-# -----------------------------------------------------------------------------
-
 
 def atoi(text):
     return int(text) if text.isdigit() else text
@@ -22,8 +18,7 @@ def natural_keys(text):
 
 def to_tensor(data, device):
     exit_data = []
-
-    for i in range(len(data)-2):
+    for i in range(data.shape[0]-2):
         samples = np.empty((1, i+2, 4), dtype=np.float32)
         samples[0, :, :] = np.array(data[:(i+2)], dtype=np.float32)
         samples = torch.tensor(samples.reshape((1, samples.shape[1], 4))).to(device)
@@ -74,19 +69,22 @@ def get_data_from(path: str, folds: list, device, mod: str):
                                 y_c = (box2d[1] + abs(box2d[1] - box2d[3])/2)/img_height
                                 if(obj['id'] in objects_id):
                                     obj_idx = objects_id.index(obj['id'])
-                                    objects_on_frames[obj_idx].append([x_c, y_c, w, h])
+                                    objects_on_frames[obj_idx] = np.append(
+                                        objects_on_frames[obj_idx],
+                                        np.array([x_c, y_c, w, h]).reshape(1, 4),
+                                        axis=0)
                                 else:
                                     objects_id.append(obj['id'])
-                                    coords = [[x_c, y_c, w, h]]
+                                    coords = np.array([x_c, y_c, w, h]).reshape(1, 4)
                                     objects_on_frames.append(coords)
 
         with tqdm(total=len(objects_on_frames), bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}') as pbar:
             for i in range(len(objects_on_frames)):
                 if(len(objects_on_frames[i]) >= 11):
                     for k in range(0, floor(len(objects_on_frames[i])/11), 1):
-                        splited_data.append(to_tensor(objects_on_frames[i][k*11:(k+1)*11], device))
+                        splited_data.append(to_tensor(objects_on_frames[i][k*11:(k+1)*11, :], device))
                     if(len(objects_on_frames[i]) - (k+1)*11 > 2):
-                        splited_data.append(to_tensor(objects_on_frames[i][(k+1)*11:], device))
+                        splited_data.append(to_tensor(objects_on_frames[i][(k+1)*11:, :], device))
                 else:
                     splited_data.append(to_tensor(objects_on_frames[i], device))
 
