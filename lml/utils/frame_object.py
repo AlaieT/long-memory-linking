@@ -1,6 +1,4 @@
 import numpy as np
-from numpy.linalg import norm
-from sklearn.metrics.pairwise import manhattan_distances
 
 
 class Frame_Object(object):
@@ -53,35 +51,44 @@ class Frame_Object(object):
             self._b_h = self._b_h[:-self._lost_frames]
             self._lost_frames = 0
 
-    def mahalanobis_distance(self, cl: np.float32, x: np.float32, y: np.float32, w: np.float32, h: np.float32) -> int:
+    @staticmethod
+    def bb_intersection(boxA, boxB):
+        xA = max(boxA[0], boxB[0])
+        yA = max(boxA[1], boxB[1])
+        xB = min(boxA[2], boxB[2])
+        yB = min(boxA[3], boxB[3])
+
+        interArea = max(0, xB - xA) * max(0, yB - yA)
+        return interArea
+
+    def metrick_distance(self, x: np.float32, y: np.float32, w: np.float32, h: np.float32) -> int:
+
+        _x = (self._x_c[self._x_c != -1])[-1]
+        _y = (self._y_c[self._y_c != -1])[-1]
+        _w = (self._b_w[self._b_w != -1])[-1]
+        _h = (self._b_h[self._b_h != -1])[-1]
 
         all_Mah = []
+        all_IOU = []
         all_fin = []
 
-        th_Mah = 0.8
-        eps = 0.55
+        th_Mah = 1/self._max_pred_frames
 
-        _x = (self._x_c[self._x_c != -1])
-        _y = (self._y_c[self._y_c != -1])
-        _w = (self._b_w[self._b_w != -1])
-        _h = (self._b_h[self._b_h != -1])
+        pred = np.array([_x, _y, _w, _h])
 
-        pred = np.array([_x[-1], _y[-1], _w[-1], _h[-1]])
-
-        # calculate all distances
         for i in range(len(x)):
-            if(cl[i] == self._class):
+            real = np.array([x[i], y[i],  w[i], h[i]])
 
-                real = np.array([x[i], y[i],  w[i], h[i]])
+            dx = np.mean(np.abs(pred - real))
+            iou = self.bb_intersection(
+                [_x - _w / 2, _y - _h / 2, _x + _w / 2, _y + _h / 2],
+                [x[i] - w[i] / 2, y[i] - h[i] / 2, x[i] + w[i] / 2, y[i] + h[i] / 2])
 
-                dx = manhattan_distances(pred.reshape((1, 4)), real.reshape((1, 4)))[0][0]
-                lm = np.dot(pred, real)/(norm(pred)*norm(real))
-                d = eps*dx+(1-eps)*lm
-
-                all_Mah.append(d)
+            all_IOU.append(iou)
+            all_Mah.append(dx)
 
         for i in range(len(all_Mah)):
-            if(all_Mah[i] <= th_Mah):
+            if(all_Mah[i] <= th_Mah and all_IOU[i] != 0):
                 all_fin.append(all_Mah[i])
             else:
                 all_fin.append(10)
