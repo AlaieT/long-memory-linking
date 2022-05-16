@@ -53,7 +53,7 @@ class Frame_Object(object):
             self._b_h = self._b_h[:-self._lost_frames]
             self._lost_frames = 0
 
-    def mahalanobis_distance(self, cl: np.float32, x: np.float32, y: np.float32, w: np.float32, h: np.float32) -> int:
+    def mahalanobis_distance(self, cl: np.float32, x: np.float32, y: np.float32, w: np.float32, h: np.float32) -> list:
 
         all_Mah = []
         all_fin = []
