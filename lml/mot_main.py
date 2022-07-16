@@ -6,7 +6,6 @@ from lstm.predict import predict
 from lstm.model import LSTM
 import torch
 from scipy.optimize import linear_sum_assignment
-from sklearn.metrics.pairwise import manhattan_distances
 import pandas as pd
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -83,8 +82,8 @@ def lml(model_path: str, data_path: str, video: str):
 
         for i in range(frames_count):
             temp_csv = df.loc[df['filename'] == f'{video}-{"0"*(6 - len(str(i+start_frame)))}{i+start_frame}']
-            temp_csv = temp_csv[((temp_csv['confidence'] >= 0.35) & (temp_csv['class_label'] == 1)) |
-                                ((temp_csv['confidence'] >= 0.35) & (temp_csv['class_label'] == 0))]
+            temp_csv = temp_csv[((temp_csv['confidence'] >= 0.5) & (temp_csv['class_label'] == 1)) |
+                                ((temp_csv['confidence'] >= 0.5) & (temp_csv['class_label'] == 0))]
             temp_csv_new = temp_csv.drop(['confidence'], 1)
             files.append(temp_csv_new.values.tolist())
 
@@ -105,13 +104,13 @@ def lml(model_path: str, data_path: str, video: str):
                 _w = float(obj[3])
                 _h = float(obj[4])
 
-                if(_w*_h >= 0.02/IMG_DATA[video][2]):
-                    new_data = np.empty((1, 5))
-                    new_data[0:] = np.array([_class, _x, _y, _w, _h], dtype=np.float32)
+                # if(_w*_h >= 0.02/IMG_DATA[video][2]):
+                new_data = np.empty((1, 5))
+                new_data[0:] = np.array([_class, _x, _y, _w, _h], dtype=np.float32)
 
-                    if(detected_classes.shape == 0):
-                        detected_classes = np.expand_dims(detected_classes, axis=0)
-                    detected_classes = np.append(detected_classes, new_data, axis=0)
+                if(detected_classes.shape == 0):
+                    detected_classes = np.expand_dims(detected_classes, axis=0)
+                detected_classes = np.append(detected_classes, new_data, axis=0)
 
             '''
             Caluletae distance between prev-frame object and new objects, and link them
@@ -269,7 +268,7 @@ videos = ['ETH-Bahnhof', 'PETS09-S2L1', 'Venice-2']
 
 if __name__ == '__main__':
     for video in videos:
-        res_df = lml(model_path=f'./lstm/models/mot/last.pt', data_path=f'./data/mot/MOT15_fixed.csv', video=video)
+        res_df = lml(model_path=f'./lstm/models/mot/last.pt', data_path=f'./data/mot/submission_fold_0_1936.csv', video=video)
 
         if(not os.path.exists('./validation')):
             os.mkdir('./validation')

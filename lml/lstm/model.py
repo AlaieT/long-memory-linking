@@ -22,11 +22,11 @@ class LSTM(nn.Module):
 
     def forward(self, y):
         outputs, num_samples = torch.tensor([]), y.size(0)
-        h_tf = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32).to(self.device)
-        c_tf = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32).to(self.device)
+        h_tf = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32)
+        c_tf = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32)
 
-        h_tb = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32).to(self.device)
-        c_tb = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32).to(self.device)
+        h_tb = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32)
+        c_tb = torch.zeros(num_samples, self.hidden_layers, dtype=torch.float32)
 
         f_y = y.split(1, dim=1)
         b_y = torch.flip(y, dims=[1]).split(1, dim=1)
@@ -48,7 +48,7 @@ class LSTM(nn.Module):
         _w = self.linear3(h_tr)
         _h = self.linear4(h_tr)
 
-        output = torch.cat((_x, _y, _w, _h), dim=1).to(self.device)
+        output = torch.cat((_x, _y, _w, _h), dim=1)
 
         output = self.sigm(output)
 

@@ -29,7 +29,6 @@ class Frame_Object(object):
             self._y_c = np.append(np.append(self._y_c[: -1*(self._lost_frames+1)], [-1]*self._lost_frames), y)
             self._b_w = np.append(np.append(self._b_w[: -1*(self._lost_frames+1)], [-1]*self._lost_frames), w)
             self._b_h = np.append(np.append(self._b_h[: -1*(self._lost_frames+1)], [-1]*self._lost_frames), h)
-
             self._lost = False
             self._lost_frames = 0
         else:
@@ -63,10 +62,10 @@ class Frame_Object(object):
 
     def metrick_distance(self, x: np.float32, y: np.float32, w: np.float32, h: np.float32) -> int:
 
-        _x = (self._x_c[self._x_c != -1])[-1]
-        _y = (self._y_c[self._y_c != -1])[-1]
-        _w = (self._b_w[self._b_w != -1])[-1]
-        _h = (self._b_h[self._b_h != -1])[-1]
+        _x = self._x_c[-1]
+        _y = self._y_c[-1]
+        _w = self._b_w[-1]
+        _h = self._b_h[-1]
 
         all_Mah = []
         all_IOU = []
@@ -80,9 +79,8 @@ class Frame_Object(object):
             real = np.array([x[i], y[i],  w[i], h[i]])
 
             dx = np.mean(np.abs(pred - real))
-            iou = self.bb_intersection(
-                [_x - _w / 2, _y - _h / 2, _x + _w / 2, _y + _h / 2],
-                [x[i] - w[i] / 2, y[i] - h[i] / 2, x[i] + w[i] / 2, y[i] + h[i] / 2])
+            iou = self.bb_intersection([_x - _w / 2, _y - _h / 2, _x + _w / 2, _y + _h / 2],
+                                       [x[i] - w[i] / 2, y[i] - h[i] / 2, x[i] + w[i] / 2, y[i] + h[i] / 2])
 
             all_IOU.append(iou)
             all_Mah.append(dx)
